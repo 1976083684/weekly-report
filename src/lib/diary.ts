@@ -67,7 +67,7 @@ export async function createDiary(data: {
   title: string;
   content: string;
   date: string;
-  mood?: string;
+  mood?: string | null;
   tagIds?: string[];
 }) {
   return prisma.diary.create({

@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     startDate: searchParams.get("startDate") || undefined,
     endDate: searchParams.get("endDate") || undefined,
     page: Number(searchParams.get("page")) || 1,
-    pageSize: (searchParams.get("startDate") || searchParams.get("endDate")) ? 50 : 20,
+    pageSize: Number(searchParams.get("pageSize")) || 10,
   });
 
   return NextResponse.json(data);

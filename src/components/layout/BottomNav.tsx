@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, CalendarDays, Tag, Settings } from "lucide-react";
+import { LayoutDashboard, Feather, CalendarDays, Tag, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/diary", label: "日记", icon: BookOpen },
+  { href: "/dashboard", label: "仪表盘", icon: LayoutDashboard },
+  { href: "/diary", label: "日记", icon: Feather },
   { href: "/weekly", label: "周报", icon: CalendarDays },
   { href: "/tags", label: "标签", icon: Tag },
   { href: "/settings", label: "设置", icon: Settings },

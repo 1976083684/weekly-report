@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { BookOpen, Eye, EyeOff } from "lucide-react";
+import { Feather, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -56,7 +56,7 @@ export default function RegisterPage() {
       {/* Logo */}
       <div className="text-center mb-8">
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 mb-4">
-          <BookOpen className="w-8 h-8 text-primary" />
+          <Feather className="w-8 h-8 text-primary" />
         </div>
         <h1 className="font-[family-name:var(--font-serif)] text-3xl font-bold tracking-tight text-foreground">
           日记周报

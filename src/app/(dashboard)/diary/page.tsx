@@ -35,6 +35,7 @@ export default function DiaryPage() {
   const [search, setSearch] = useState("");
   const [selectedTag, setSelectedTag] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,13 +46,14 @@ export default function DiaryPage() {
     if (search) params.set("search", search);
     if (selectedTag) params.set("tagId", selectedTag);
     params.set("page", String(page));
+    params.set("pageSize", String(pageSize));
 
     const res = await fetch(`/api/diary?${params}`);
     const data = await res.json();
     setDiaries(data.diaries || []);
     setTotalPages(data.totalPages || 1);
     setLoading(false);
-  }, [search, selectedTag, page]);
+  }, [search, selectedTag, page, pageSize]);
 
   useEffect(() => {
     fetchDiaries();
@@ -220,8 +222,24 @@ export default function DiaryPage() {
             </Link>
           ))}
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 pt-2">
+          <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">每页</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="h-7 px-1.5 rounded border border-border bg-card text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                {[10, 20, 30, 40, 50, 100].map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+              <span className="text-xs text-muted-foreground">条</span>
+            </div>
+            <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -231,7 +249,7 @@ export default function DiaryPage() {
                 <ChevronLeft className="w-4 h-4" />
               </Button>
               <span className="text-sm text-muted-foreground">
-                {page} / {totalPages}
+                {page} / {totalPages || 1}
               </span>
               <Button
                 variant="outline"
@@ -242,7 +260,7 @@ export default function DiaryPage() {
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
-          )}
+          </div>
         </div>
       )}
 

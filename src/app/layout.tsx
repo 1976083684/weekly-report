@@ -1,9 +1,15 @@
 import type { Metadata } from "next";
-import { Geist_Mono, Noto_Serif_SC } from "next/font/google";
+import { Geist_Mono, Noto_Serif_SC, Noto_Sans_SC } from "next/font/google";
 import "./globals.css";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+const notoSans = Noto_Sans_SC({
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-sans",
   subsets: ["latin"],
 });
 
@@ -24,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN" className={`${geistMono.variable} ${notoSerif.variable} h-full antialiased`}>
+    <html lang="zh-CN" className={`${geistMono.variable} ${notoSans.variable} ${notoSerif.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

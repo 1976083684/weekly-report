@@ -7,7 +7,7 @@ const createSchema = z.object({
   title: z.string().min(1, "请输入标题").max(200, "标题最多200字"),
   content: z.string().min(1, "请输入内容"),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "日期格式不正确"),
-  mood: z.enum(["happy", "calm", "normal", "sad", "awful"]).optional(),
+  mood: z.enum(["happy", "calm", "normal", "sad", "awful"]).nullable().optional(),
   tagIds: z.array(z.string()).optional(),
 });
 
