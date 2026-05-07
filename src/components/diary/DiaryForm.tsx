@@ -1,15 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MarkdownEditor } from "@/components/editor/MarkdownEditor";
 import { MoodSelector } from "@/components/editor/MoodSelector";
 import { TagInput } from "@/components/editor/TagInput";
+import { AiOptimizeButton } from "@/components/ai/AiOptimizeButton";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/toast";
+
+const weekLabels = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+
+function defaultTitle(date: string): string {
+  const d = new Date(date + "T00:00:00");
+  return `${weekLabels[d.getDay()]} ${date} 日记`;
+}
 
 interface Tag {
   id: string;
@@ -40,6 +48,8 @@ export function DiaryForm({ initialData }: DiaryFormProps) {
     initialData?.tags?.map((t) => t.tag) || []
   );
   const [loading, setLoading] = useState(false);
+  const [loadingDiary, setLoadingDiary] = useState(false);
+  const [existingDiaryId, setExistingDiaryId] = useState<string | null>(initialData?.id || null);
   const [alert, setAlert] = useState<{
     open: boolean;
     type: "success" | "error";
@@ -47,23 +57,66 @@ export function DiaryForm({ initialData }: DiaryFormProps) {
     onConfirm?: () => void;
   }>({ open: false, type: "success", message: "" });
 
+  // When date changes (and not in initial-data mode), load diary for that date
+  const loadDiaryByDate = useCallback(async (targetDate: string) => {
+    if (initialData?.date === targetDate) return; // Already loaded via initialData
+    setLoadingDiary(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("dateFrom", targetDate);
+      params.set("dateTo", targetDate);
+      params.set("type", "diary");
+      params.set("pageSize", "1");
+      const res = await fetch(`/api/diary?${params}`);
+      const data = await res.json();
+      const list = data.diaries || [];
+      if (list.length > 0) {
+        const d = list[0];
+        const dateStr = d.date.slice(0, 10);
+        setExistingDiaryId(d.id);
+        // Only pre-fill if user hasn't already typed content
+        if (!content) {
+          setContent(d.content || "");
+          setTitle(d.title || "");
+          setMood(d.mood || null);
+          setTags((d.tags || []).map((t: { tag: Tag }) => t.tag));
+        }
+        toast("success", `已加载 ${dateStr} 的日记`);
+      } else {
+        setExistingDiaryId(null);
+      }
+    } catch {
+      // ignore
+    }
+    setLoadingDiary(false);
+  }, [initialData]);
+
+  useEffect(() => {
+    if (!initialData) {
+      loadDiaryByDate(date);
+    }
+  }, [date]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
+    const resolvedTitle = title.trim() || defaultTitle(date);
     const body = {
-      title,
+      title: resolvedTitle,
       content,
       date,
       mood,
+      type: "diary",
       tagIds: tags.map((t) => t.id),
     };
 
     try {
-      const url = initialData
-        ? `/api/diary/${initialData.id}`
+      const targetId = existingDiaryId || initialData?.id;
+      const url = targetId
+        ? `/api/diary/${targetId}`
         : "/api/diary";
-      const method = initialData ? "PUT" : "POST";
+      const method = targetId ? "PUT" : "POST";
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
@@ -77,7 +130,7 @@ export function DiaryForm({ initialData }: DiaryFormProps) {
         return;
       }
 
-      toast("success", "保存成功");
+      toast("success", existingDiaryId ? "已覆盖保存" : "保存成功");
       setTimeout(() => {
         router.push("/diary");
         router.refresh();
@@ -102,9 +155,9 @@ export function DiaryForm({ initialData }: DiaryFormProps) {
         <h1 className="text-xl font-semibold text-foreground flex-1">
           {initialData ? "编辑日记" : "写日记"}
         </h1>
-        <Button type="submit" disabled={loading}>
+        <Button type="submit" disabled={loading || loadingDiary}>
           <Save className="w-4 h-4 mr-2" />
-          {loading ? "保存中..." : "保存"}
+          {loading ? "保存中..." : existingDiaryId ? "覆盖保存" : "保存"}
         </Button>
       </div>
 
@@ -122,9 +175,8 @@ export function DiaryForm({ initialData }: DiaryFormProps) {
       <Input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="标题..."
+        placeholder={date ? `不填则使用：${defaultTitle(date)}` : "标题..."}
         className="text-lg font-medium border-0 border-b border-border rounded-none px-0 focus-visible:ring-0 focus-visible:border-primary"
-        required
       />
 
       <div className="flex flex-wrap items-center gap-4">
@@ -133,10 +185,21 @@ export function DiaryForm({ initialData }: DiaryFormProps) {
           <Input
             type="date"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(e) => {
+              setDate(e.target.value);
+              setExistingDiaryId(null);
+              setContent("");
+              setTitle("");
+              setMood(null);
+              setTags([]);
+            }}
             className="w-auto"
             required
           />
+          {loadingDiary && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+          {existingDiaryId && !loadingDiary && (
+            <span className="text-xs text-success">已加载当日日记，保存将覆盖</span>
+          )}
         </div>
         <MoodSelector value={mood} onChange={setMood} />
       </div>
@@ -146,6 +209,13 @@ export function DiaryForm({ initialData }: DiaryFormProps) {
         onChange={setContent}
         placeholder="今天发生了什么..."
         minHeight="400px"
+      />
+
+      <AiOptimizeButton
+        content={content}
+        type="diary"
+        onAccept={(optimized) => setContent(optimized)}
+        placeholder="今天发生了什么..."
       />
 
       <TagInput selected={tags} onChange={setTags} />

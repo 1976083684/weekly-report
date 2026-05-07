@@ -10,13 +10,13 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { configId } = await request.json();
+    const { configId, scope } = await request.json();
 
     if (!configId) {
       return NextResponse.json({ error: "请指定备份配置" }, { status: 400 });
     }
 
-    const { status, message } = await backupToGit(configId, session.user.id);
+    const { status, message } = await backupToGit(configId, session.user.id, scope || "week");
 
     await prisma.backupLog.create({
       data: {

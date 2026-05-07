@@ -7,48 +7,86 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 
-interface Weekly {
+interface TimelineItem {
   id: string;
   title: string;
   content: string;
-  startDate: string;
-  endDate: string;
+  date: string;
+  endDate?: string;
+  kind: "weekly" | "daily_report";
 }
 
 export default function WeeklyPage() {
-  const [weeklies, setWeeklies] = useState<Weekly[]>([]);
+  const [items, setItems] = useState<TimelineItem[]>([]);
   const [search, setSearch] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
 
-  const fetchWeeklies = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams();
-    if (search) params.set("search", search);
-    if (startDate) params.set("startDate", startDate);
-    if (endDate) params.set("endDate", endDate);
-    params.set("page", String(page));
-    params.set("pageSize", String(pageSize));
 
-    const res = await fetch(`/api/weekly?${params}`);
-    const data = await res.json();
-    setWeeklies(data.weeklies || []);
-    setTotalPages(data.totalPages || 1);
+    // Fetch weeklies
+    const weeklyParams = new URLSearchParams();
+    if (search) weeklyParams.set("search", search);
+    if (startDate) weeklyParams.set("startDate", startDate);
+    if (endDate) weeklyParams.set("endDate", endDate);
+    weeklyParams.set("page", String(page));
+    weeklyParams.set("pageSize", String(pageSize));
+
+    // Fetch daily reports
+    const diaryParams = new URLSearchParams();
+    diaryParams.set("type", "daily_report");
+    if (search) diaryParams.set("search", search);
+    if (startDate) diaryParams.set("dateFrom", startDate);
+    if (endDate) diaryParams.set("dateTo", endDate);
+    diaryParams.set("page", "1");
+    diaryParams.set("pageSize", "100");
+
+    const [weeklyRes, diaryRes] = await Promise.all([
+      fetch(`/api/weekly?${weeklyParams}`),
+      fetch(`/api/diary?${diaryParams}`),
+    ]);
+    const weeklyData = await weeklyRes.json();
+    const diaryData = await diaryRes.json();
+
+    const merged: TimelineItem[] = [
+      ...(weeklyData.weeklies || []).map((w: { id: string; title: string; content: string; startDate: string; endDate: string }) => ({
+        id: w.id,
+        title: w.title,
+        content: w.content,
+        date: w.startDate,
+        endDate: w.endDate,
+        kind: "weekly" as const,
+      })),
+      ...(diaryData.diaries || []).map((d: { id: string; title: string; content: string; date: string }) => ({
+        id: d.id,
+        title: d.title,
+        content: d.content,
+        date: d.date.slice(0, 10),
+        kind: "daily_report" as const,
+      })),
+    ];
+
+    // Sort by date descending
+    merged.sort((a, b) => b.date.localeCompare(a.date));
+
+    setItems(merged);
     setLoading(false);
   }, [search, startDate, endDate, page, pageSize]);
 
   useEffect(() => {
-    fetchWeeklies();
-  }, [fetchWeeklies]);
+    fetchData();
+  }, [fetchData]);
 
-  const deleteWeekly = async (id: string) => {
-    if (!confirm("确定删除这份周报？此操作不可撤销。")) return;
-    await fetch(`/api/weekly/${id}`, { method: "DELETE" });
-    fetchWeeklies();
+  const deleteItem = async (id: string, kind: string) => {
+    const label = kind === "weekly" ? "周报" : "日报";
+    if (!confirm(`确定删除这份${label}？此操作不可撤销。`)) return;
+    const apiPath = kind === "weekly" ? `/api/weekly/${id}` : `/api/diary/${id}`;
+    await fetch(apiPath, { method: "DELETE" });
+    fetchData();
   };
 
   const handleReset = () => {
@@ -64,6 +102,10 @@ export default function WeeklyPage() {
     const d = new Date(date);
     return `${d.getMonth() + 1}月${d.getDate()}日`;
   };
+
+  // Client-side pagination after merge
+  const pagedItems = items.slice((page - 1) * pageSize, page * pageSize);
+  const displayTotalPages = Math.ceil(items.length / pageSize) || 1;
 
   const truncate = (text: string, n: number) =>
     text.length > n ? text.slice(0, n) + "..." : text;
@@ -128,9 +170,9 @@ export default function WeeklyPage() {
         <div className="text-center py-16">
           <p className="text-muted-foreground text-sm">加载中...</p>
         </div>
-      ) : weeklies.length === 0 ? (
+      ) : items.length === 0 ? (
         <div className="text-center py-16">
-          <p className="text-muted-foreground text-sm mb-4">还没有周报</p>
+          <p className="text-muted-foreground text-sm mb-4">还没有周报或日报</p>
           <Link href="/weekly/new">
             <Button>
               <Plus className="w-4 h-4 mr-2" />
@@ -140,29 +182,36 @@ export default function WeeklyPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {weeklies.map((weekly) => (
+          {pagedItems.map((item) => (
             <Link
-              key={weekly.id}
-              href={`/weekly/${weekly.id}/edit`}
+              key={`${item.kind}-${item.id}`}
+              href={item.kind === "weekly" ? `/weekly/${item.id}/edit` : `/diary/${item.id}/edit`}
               className="block"
             >
               <article className="bg-card rounded-xl border border-border p-4 transition-colors hover:border-primary/30">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-foreground truncate mb-1">
-                      {weekly.title}
-                    </h3>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={item.kind === "weekly" ? "text-primary text-xs bg-primary/10 px-1.5 py-0.5 rounded font-medium" : "text-blue-500 text-xs bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded font-medium"}>
+                        {item.kind === "weekly" ? "周报" : "日报"}
+                      </span>
+                      <h3 className="font-medium text-foreground truncate">
+                        {item.title}
+                      </h3>
+                    </div>
                     <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
-                      {truncate(weekly.content.replace(/[#*`\-]/g, ""), 120)}
+                      {truncate(item.content.replace(/[#*`\-]/g, ""), 120)}
                     </p>
                     <p className="text-xs text-muted-foreground mt-2">
-                      {formatDate(weekly.startDate)} ~ {formatDate(weekly.endDate)}
+                      {item.kind === "weekly" && item.endDate
+                        ? `${formatDate(item.date)} ~ ${formatDate(item.endDate)}`
+                        : formatDate(item.date)}
                     </p>
                   </div>
                   <button
                     onClick={(e) => {
                       e.preventDefault();
-                      deleteWeekly(weekly.id);
+                      deleteItem(item.id, item.kind);
                     }}
                     className="p-1.5 rounded-md text-muted-foreground hover:bg-danger/10 hover:text-danger transition-colors shrink-0"
                     title="删除"
@@ -201,12 +250,12 @@ export default function WeeklyPage() {
                 <ChevronLeft className="w-4 h-4" />
               </Button>
               <span className="text-sm text-muted-foreground">
-                {page} / {totalPages || 1}
+                {page} / {displayTotalPages}
               </span>
               <Button
                 variant="outline"
                 size="sm"
-                disabled={page >= totalPages}
+                disabled={page >= displayTotalPages}
                 onClick={() => setPage(page + 1)}
               >
                 <ChevronRight className="w-4 h-4" />

@@ -21,6 +21,7 @@ model User {
   tags           Tag[]
   backupConfigs  BackupConfig[]
   backupLogs     BackupLog[]
+  aiModels       AIModel[]
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 }
@@ -65,6 +66,7 @@ model Diary {
   title     String
   content   String
   date      DateTime
+  type      String    @default("diary")
   mood      String?
   pinned    Boolean   @default(false)
   tags      DiaryTag[]
@@ -73,6 +75,7 @@ model Diary {
   updatedAt DateTime  @updatedAt
 
   @@index([userId, date])
+  @@index([userId, type])
   @@index([userId, pinned])
 }
 
@@ -121,6 +124,27 @@ model BackupConfig {
   logs     BackupLog[]
 
   @@unique([userId, provider])
+}
+
+model AIModel {
+  id          String   @id @default(cuid())
+  userId      String
+  provider    String   // 供应商名称
+  modelName   String   // 主模型名称
+  apiKey      String   // AES-256-GCM 加密存储
+  baseUrl     String   // API 请求地址
+  website     String?  // 官网链接
+  notes       String?  // 备注说明
+  haikuModel  String?  // Haiku 默认模型映射
+  sonnetModel String?  // Sonnet 默认模型映射
+  opusModel   String?  // Opus 默认模型映射
+  configJson  String?  // cc-Switch 配置 JSON
+  isActive    Boolean  @default(false)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, provider, modelName])
 }
 
 model BackupLog {

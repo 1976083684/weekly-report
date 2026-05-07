@@ -23,12 +23,25 @@ export async function GET(request: NextRequest) {
   sunday.setDate(monday.getDate() + 6);
   sunday.setHours(23, 59, 59, 999);
 
-  const mondayStr = monday.toISOString().split("T")[0];
-  const sundayStr = sunday.toISOString().split("T")[0];
+  function toLocalDateStr(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
 
-  // 年度范围
-  const yearStart = new Date(year, 0, 1);
-  const yearEnd = new Date(year, 11, 31);
+  const mondayStr = toLocalDateStr(monday);
+  const sundayStr = toLocalDateStr(sunday);
+
+  // 年度范围 — 最新年份使用滚动365天，往年使用自然年
+  const isCurrentYear = year === now.getFullYear();
+  let yearStart: Date;
+  let yearEnd: Date;
+  if (isCurrentYear) {
+    yearEnd = new Date();
+    yearStart = new Date(now);
+    yearStart.setDate(now.getDate() - 365);
+  } else {
+    yearStart = new Date(year, 0, 1);
+    yearEnd = new Date(year, 11, 31);
+  }
 
   // 并行查询
   const [
@@ -67,17 +80,16 @@ export async function GET(request: NextRequest) {
   ]);
 
   // 本周每天日记数
-  const weekDays = ["一", "二", "三", "四", "五", "六", "日"];
   const weekDates: string[] = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
-    weekDates.push(d.toISOString().split("T")[0]);
+    weekDates.push(toLocalDateStr(d));
   }
 
   const weekDailyCount = weekDates.map((d) => ({
     date: d,
-    count: weekDiaries.filter((e) => e.date.toISOString().split("T")[0] === d).length,
+    count: weekDiaries.filter((e) => toLocalDateStr(e.date) === d).length,
   }));
 
   // 本周活跃天数
@@ -86,7 +98,7 @@ export async function GET(request: NextRequest) {
   // 年度活跃度数据（按日统计，用于热力图）
   const yearDateMap = new Map<string, number>();
   for (const diary of yearDiaries) {
-    const dateKey = diary.date.toISOString().split("T")[0];
+    const dateKey = toLocalDateStr(diary.date);
     yearDateMap.set(dateKey, (yearDateMap.get(dateKey) || 0) + 1);
   }
   const activityData = Array.from(yearDateMap.entries()).map(([date, count]) => ({
@@ -109,12 +121,27 @@ export async function GET(request: NextRequest) {
     .sort((a, b) => b.count - a.count)
     .slice(0, 8);
 
-  // 年度汇总（按月统计）
-  const monthCounts = new Array(12).fill(0);
-  for (const diary of yearDiaries) {
-    const m = diary.date.getMonth();
-    monthCounts[m]++;
+  // 月度汇总
+  const monthLabels: string[] = [];
+  const cursor = new Date(yearStart);
+  cursor.setDate(1);
+  while (cursor <= yearEnd) {
+    monthLabels.push(`${cursor.getMonth() + 1}月`);
+    cursor.setMonth(cursor.getMonth() + 1);
   }
+
+  const monthCounts = new Array(monthLabels.length).fill(0);
+  const startMonth = yearStart.getFullYear() * 12 + yearStart.getMonth();
+
+  for (const diary of yearDiaries) {
+    const diaryMonth = diary.date.getFullYear() * 12 + diary.date.getMonth();
+    const idx = diaryMonth - startMonth;
+    if (idx >= 0 && idx < monthCounts.length) {
+      monthCounts[idx]++;
+    }
+  }
+
+  const totalDiariesInRange = yearDiaries.length;
 
   return NextResponse.json({
     stats: {
@@ -128,6 +155,9 @@ export async function GET(request: NextRequest) {
     activityData,
     topTags,
     monthCounts,
+    monthLabels,
+    totalDiariesInRange,
+    isCurrentYear,
     recentDiaries: recentDiaries.map((d) => ({
       id: d.id,
       title: d.title,

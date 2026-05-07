@@ -5,6 +5,7 @@ import { Save, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MarkdownEditor } from "@/components/editor/MarkdownEditor";
 import { TagInput } from "@/components/editor/TagInput";
+import { AiOptimizeButton } from "@/components/ai/AiOptimizeButton";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
@@ -39,10 +40,10 @@ export function WeeklyForm() {
   const weekDays = getWeekDates();
   const today = new Date().toISOString().slice(0, 10);
 
-  const [selectedDay, setSelectedDay] = useState(
-    weekDays.find((d) => d.date === today)?.label || weekDays[0].label
-  );
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [diaries, setDiaries] = useState<Map<string, DiaryData>>(new Map());
+  interface EntrySummary { title: string; content: string; date: string; type: string; }
+  const [allEntries, setAllEntries] = useState<EntrySummary[]>([]);
   const [saving, setSaving] = useState(false);
   const [alert, setAlert] = useState<{
     open: boolean;
@@ -56,17 +57,18 @@ export function WeeklyForm() {
   const [existingWeeklyId, setExistingWeeklyId] = useState<string | null>(null);
   const [weeklyLoaded, setWeeklyLoaded] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [showWeekly, setShowWeekly] = useState(false);
+  const [showWeekly, setShowWeekly] = useState(true);
 
   // Load all diaries + existing weekly for this week
   useEffect(() => {
     const startDate = weekDays[0].date;
     const endDate = weekDays[6].date;
 
-    // Fetch diaries
+    // Fetch daily reports for editor (type=daily_report)
     const diaryParams = new URLSearchParams();
     diaryParams.set("dateFrom", startDate);
     diaryParams.set("dateTo", endDate);
+    diaryParams.set("type", "daily_report");
     diaryParams.set("pageSize", "50");
     fetch(`/api/diary?${diaryParams}`)
       .then((r) => r.json())
@@ -82,6 +84,19 @@ export function WeeklyForm() {
           });
         }
         setDiaries(map);
+      })
+      .catch(() => {});
+
+    // Fetch all entries (diary + daily_report) for weekly summary
+    const allParams = new URLSearchParams();
+    allParams.set("dateFrom", startDate);
+    allParams.set("dateTo", endDate);
+    allParams.set("pageSize", "100");
+    fetch(`/api/diary?${allParams}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const allList = data.diaries || [];
+        setAllEntries(allList);
       })
       .catch(() => {});
 
@@ -103,15 +118,13 @@ export function WeeklyForm() {
       .catch(() => setWeeklyLoaded(true));
   }, []);
 
-  const currentDiary = diaries.get(
-    weekDays.find((d) => d.label === selectedDay)!.date
-  ) || {
-    content: "",
-    date: weekDays.find((d) => d.label === selectedDay)!.date,
-    tags: [],
-  };
+  const currentDay = weekDays.find((d) => d.label === selectedDay);
+  const currentDiary = currentDay
+    ? (diaries.get(currentDay.date) || { content: "", date: currentDay.date, tags: [] })
+    : { content: "", date: today, tags: [] };
 
   const updateCurrentDiary = (field: string, value: unknown) => {
+    if (!selectedDay) return;
     const date = weekDays.find((d) => d.label === selectedDay)!.date;
     const next = new Map(diaries);
     const existing = next.get(date) || { content: "", date, tags: [] };
@@ -120,8 +133,8 @@ export function WeeklyForm() {
   };
 
   const handleSave = async () => {
-    if (!currentDiary.content.trim()) {
-      setAlert({ open: true, type: "error", message: "请输入内容" });
+    if (!selectedDay || !currentDiary.content.trim()) {
+      setAlert({ open: true, type: "error", message: "请选择日期并输入内容" });
       return;
     }
     setSaving(true);
@@ -130,11 +143,12 @@ export function WeeklyForm() {
     const diary = diaries.get(date);
     const content = diary?.content || currentDiary.content;
     const tags = diary?.tags || currentDiary.tags;
-    const title = `${selectedDay} ${date} 日记`;
+    const title = `${selectedDay} ${date} 日报`;
     const body = {
       title,
       content,
       date,
+      type: "daily_report",
       tagIds: tags.map((t) => t.id),
     };
 
@@ -259,7 +273,9 @@ export function WeeklyForm() {
         <div className="w-px h-8 bg-border mx-1 shrink-0" />
         <button
           type="button"
-          onClick={() => setShowWeekly(!showWeekly)}
+          onClick={() => {
+            setShowWeekly(true);
+          }}
           className={cn(
             "flex flex-col items-center px-3 py-1.5 rounded-lg text-xs transition-colors shrink-0",
             showWeekly
@@ -308,22 +324,33 @@ export function WeeklyForm() {
             placeholder="点击「聚合」生成周报..."
             minHeight="500px"
           />
-          {/* Preview of diary excerpts */}
+
+          <AiOptimizeButton
+            content={weeklyContent}
+            type="weekly"
+            onAccept={(optimized) => setWeeklyContent(optimized)}
+            placeholder="请先生成或输入周报内容"
+          />
+
+          {/* Preview of all week entries */}
           <div className="bg-card rounded-xl border border-border p-4 space-y-2">
-            <h3 className="text-sm font-medium text-foreground">本周日记汇总</h3>
-            {Array.from(diaries.entries()).length === 0 ? (
-              <p className="text-sm text-muted-foreground">本周还没有日记记录</p>
+            <h3 className="text-sm font-medium text-foreground">本周汇总</h3>
+            {allEntries.length === 0 ? (
+              <p className="text-sm text-muted-foreground">本周还没有记录</p>
             ) : (
               <div className="space-y-2">
-                {weekDays.map((day) => {
-                  const diary = diaries.get(day.date);
-                  if (!diary || !diary.content) return null;
-                  const excerpt = diary.content.replace(/[#*`\->]/g, "").slice(0, 60);
+                {allEntries.map((entry) => {
+                  const entryDate = entry.date.slice(0, 10);
+                  const dayInfo = weekDays.find((d) => d.date === entryDate);
+                  const label = dayInfo ? dayInfo.label : entryDate;
+                  const excerpt = entry.content.replace(/[#*`\->]/g, "").slice(0, 60);
+                  const typeTag = entry.type === "daily_report" ? "日报" : "日记";
                   return (
-                    <div key={day.date} className="flex items-start gap-2 text-sm">
-                      <span className="text-primary font-medium shrink-0">{day.label}：</span>
+                    <div key={`${entry.date}-${entry.title}`} className="flex items-start gap-2 text-sm">
+                      <span className="text-primary font-medium shrink-0">{label}：</span>
+                      <span className="text-muted-foreground text-xs shrink-0 bg-muted px-1 rounded">{typeTag}</span>
                       <span className="text-foreground">
-                        {excerpt}{diary.content.length > 60 ? "..." : ""}
+                        {excerpt}{entry.content.length > 60 ? "..." : ""}
                       </span>
                     </div>
                   );
@@ -353,6 +380,13 @@ export function WeeklyForm() {
             onChange={(v) => updateCurrentDiary("content", v)}
             placeholder={`${selectedDay}发生了什么...`}
             minHeight="400px"
+          />
+
+          <AiOptimizeButton
+            content={currentDiary.content}
+            type="daily_report"
+            onAccept={(optimized) => updateCurrentDiary("content", optimized)}
+            placeholder={`${selectedDay}发生了什么...`}
           />
 
           <TagInput

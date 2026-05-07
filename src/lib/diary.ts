@@ -11,6 +11,7 @@ export async function getDiaries({
   tagId,
   dateFrom,
   dateTo,
+  type,
   page = 1,
   pageSize = 20,
 }: {
@@ -19,10 +20,13 @@ export async function getDiaries({
   tagId?: string;
   dateFrom?: string;
   dateTo?: string;
+  type?: string;
   page?: number;
   pageSize?: number;
 }) {
   const where: Prisma.DiaryWhereInput = { userId };
+
+  if (type) where.type = type;
 
   if (search) {
     where.OR = [
@@ -67,6 +71,7 @@ export async function createDiary(data: {
   title: string;
   content: string;
   date: string;
+  type?: string;
   mood?: string | null;
   tagIds?: string[];
 }) {
@@ -76,6 +81,7 @@ export async function createDiary(data: {
       title: data.title,
       content: data.content,
       date: new Date(data.date),
+      type: data.type,
       mood: data.mood,
       tags: data.tagIds?.length
         ? { create: data.tagIds.map((tagId) => ({ tagId })) }

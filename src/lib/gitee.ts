@@ -12,7 +12,9 @@ export async function pushToGitee(options: PushOptions) {
   const { token, owner, repo, branch, path, content, message } = options;
   const baseUrl = `https://gitee.com/api/v5/repos/${owner}/${repo}`;
 
-  const contentBase64 = Buffer.from(content).toString("base64");
+  // Normalize line endings and encode as base64 (UTF-8)
+  const normalized = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const contentBase64 = Buffer.from(normalized, "utf-8").toString("base64");
 
   // Get current file SHA (if exists)
   let sha: string | undefined;
@@ -30,18 +32,22 @@ export async function pushToGitee(options: PushOptions) {
 
   // Create or update file
   const body: Record<string, string> = {
-    access_token: token,
     content: contentBase64,
     message,
     branch,
   };
   if (sha) body.sha = sha;
 
-  const putRes = await fetch(`${baseUrl}/contents/${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  // Gitee: POST for new file, PUT for update
+  const method = sha ? "PUT" : "POST";
+  const putRes = await fetch(
+    `${baseUrl}/contents/${path}?access_token=${token}`,
+    {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }
+  );
 
   if (!putRes.ok) {
     const err = await putRes.json().catch(() => ({ message: putRes.statusText }));

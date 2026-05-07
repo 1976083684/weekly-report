@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Search, X, Pin, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Search, X, Pin, Trash2, ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { cn } from "@/lib/utils";
 
 const moods: Record<string, string> = {
@@ -34,6 +35,8 @@ export default function DiaryPage() {
   const [diaries, setDiaries] = useState<Diary[]>([]);
   const [search, setSearch] = useState("");
   const [selectedTag, setSelectedTag] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
@@ -43,8 +46,11 @@ export default function DiaryPage() {
   const fetchDiaries = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
+    params.set("type", "diary");
     if (search) params.set("search", search);
     if (selectedTag) params.set("tagId", selectedTag);
+    if (dateFrom) params.set("dateFrom", dateFrom);
+    if (dateTo) params.set("dateTo", dateTo);
     params.set("page", String(page));
     params.set("pageSize", String(pageSize));
 
@@ -53,7 +59,7 @@ export default function DiaryPage() {
     setDiaries(data.diaries || []);
     setTotalPages(data.totalPages || 1);
     setLoading(false);
-  }, [search, selectedTag, page, pageSize]);
+  }, [search, selectedTag, dateFrom, dateTo, page, pageSize]);
 
   useEffect(() => {
     fetchDiaries();
@@ -98,14 +104,15 @@ export default function DiaryPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold text-foreground">我的日记</h1>
         <Link href="/diary/new">
-          <Button size="sm" className="md:hidden">
-            <Plus className="w-4 h-4" />
+          <Button size="sm">
+            <Plus className="w-4 h-4 mr-1" />
+            写日记
           </Button>
         </Link>
       </div>
 
-      <div className="flex items-center gap-3 mb-4">
-        <div className="relative flex-1">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="relative flex-1 min-w-[180px]">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
@@ -132,6 +139,32 @@ export default function DiaryPage() {
             <option key={t.id} value={t.id}>{t.name}</option>
           ))}
         </select>
+        <DateRangePicker
+          startDate={dateFrom}
+          endDate={dateTo}
+          onChange={(s, e) => {
+            setDateFrom(s);
+            setDateTo(e);
+            setPage(1);
+          }}
+        />
+        {(search || selectedTag || dateFrom || dateTo) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSearch("");
+              setSelectedTag("");
+              setDateFrom("");
+              setDateTo("");
+              setPage(1);
+            }}
+            className="shrink-0 text-muted-foreground"
+            title="重置搜索条件"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </Button>
+        )}
       </div>
 
       {diaries.length === 0 ? (
@@ -264,12 +297,6 @@ export default function DiaryPage() {
         </div>
       )}
 
-      <Link
-        href="/diary/new"
-        className="hidden md:flex fixed bottom-8 right-8 w-14 h-14 rounded-full bg-primary text-white items-center justify-center shadow-lg hover:bg-primary-hover transition-colors z-40"
-      >
-        <Plus className="w-6 h-6" />
-      </Link>
     </div>
   );
 }

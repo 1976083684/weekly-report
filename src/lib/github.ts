@@ -12,7 +12,8 @@ export async function pushToGitHub(options: PushOptions) {
   const { token, owner, repo, branch, path, content, message } = options;
   const baseUrl = `https://api.github.com/repos/${owner}/${repo}`;
 
-  const contentBase64 = Buffer.from(content).toString("base64");
+  const normalized = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const contentBase64 = Buffer.from(normalized, "utf-8").toString("base64");
 
   // Get current file SHA (if exists)
   let sha: string | undefined;

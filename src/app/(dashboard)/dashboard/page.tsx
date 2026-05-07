@@ -44,6 +44,9 @@ interface DashboardData {
   activityData: { date: string; count: number }[];
   topTags: TopTag[];
   monthCounts: number[];
+  monthLabels: string[];
+  totalDiariesInRange: number;
+  isCurrentYear: boolean;
   recentDiaries: RecentDiary[];
 }
 
@@ -54,6 +57,10 @@ function getHeatColor(count: number): string {
   if (count <= 2) return "bg-emerald-300";
   if (count <= 4) return "bg-emerald-400";
   return "bg-emerald-500";
+}
+
+function toLocalDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function formatDate(dateStr: string) {
@@ -103,6 +110,13 @@ export default function DashboardPage() {
 
   const { stats, weekDailyCount, activityData, topTags, recentDiaries } = data;
 
+  // 热力图日期范围
+  const now = new Date();
+  const heatmapStart = data.isCurrentYear
+    ? new Date(now.getFullYear(), now.getMonth(), now.getDate() - 365)
+    : new Date(year, 0, 1);
+  const heatmapEnd = data.isCurrentYear ? new Date() : new Date(year, 11, 31);
+
   // 构建热力图数据
   const buildHeatmap = () => {
     const activityMap = new Map<string, number>();
@@ -110,15 +124,9 @@ export default function DashboardPage() {
       activityMap.set(item.date, item.count);
     }
 
-    // 从1月1日开始，到12月31日结束
-    const startDate = new Date(year, 0, 1);
-    const endDate = new Date(year, 11, 31);
-
-    // 找到起始周的周日（Gitee风格从周日开始）
-    const firstDay = new Date(startDate);
-    const firstDayOfWeek = firstDay.getDay();
-    // 对齐到周日
-    firstDay.setDate(firstDay.getDate() - firstDayOfWeek);
+    // 对齐到周日（Gitee风格从周日开始）
+    const firstDay = new Date(heatmapStart);
+    firstDay.setDate(firstDay.getDate() - firstDay.getDay());
 
     const weeks: { date: Date; count: number }[][] = [];
     const monthLabels: { label: string; weekIndex: number }[] = [];
@@ -126,25 +134,24 @@ export default function DashboardPage() {
     let weekIndex = 0;
     let lastMonth = -1;
 
-    while (currentDate <= endDate || weeks.length === 0) {
+    while (currentDate <= heatmapEnd || weeks.length === 0) {
       const week: { date: Date; count: number }[] = [];
       for (let d = 0; d < 7; d++) {
-        const dateStr = currentDate.toISOString().split("T")[0];
         const m = currentDate.getMonth();
-        if (d === 0 && m !== lastMonth && currentDate.getFullYear() === year) {
+        if (d === 0 && m !== lastMonth) {
           monthLabels.push({ label: `${m + 1}月`, weekIndex });
           lastMonth = m;
         }
         week.push({
           date: new Date(currentDate),
-          count: activityMap.get(dateStr) || 0,
+          count: activityMap.get(toLocalDateStr(currentDate)) || 0,
         });
         currentDate.setDate(currentDate.getDate() + 1);
       }
       weeks.push(week);
       weekIndex++;
-      // 如果已经过了年末，且完成了本周，结束
-      if (currentDate > endDate && currentDate.getDay() === 0) break;
+      // 如果已经过了结束日期，且完成了本周，结束
+      if (currentDate > heatmapEnd && currentDate.getDay() === 0) break;
       // 安全限制
       if (weeks.length > 60) break;
     }
@@ -165,12 +172,6 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-semibold text-foreground font-[family-name:var(--font-serif)]">
           仪表盘
         </h1>
-        <Link href="/diary/new">
-          <Button size="sm">
-            <Plus className="w-4 h-4 mr-1" />
-            写日记
-          </Button>
-        </Link>
       </div>
 
       {/* 统计卡片 */}
@@ -250,7 +251,11 @@ export default function DashboardPage() {
             {/* 描述 */}
             <p className="text-xs text-muted-foreground mb-3">
               {stats.totalDiaries > 0
-                ? `${year} 年共有 ${activityData.length} 天有记录，合计 ${stats.totalDiaries} 篇日记`
+                ? data.isCurrentYear
+                  ? `最近一年共有 ${activityData.length} 天有记录，合计 ${data.totalDiariesInRange} 篇日记`
+                  : `${year} 年共有 ${activityData.length} 天有记录，合计 ${data.totalDiariesInRange} 篇日记`
+                : data.isCurrentYear
+                ? `最近一年暂无记录`
                 : `${year} 年暂无记录`}
             </p>
 
@@ -284,23 +289,24 @@ export default function DashboardPage() {
                     <div className="flex flex-1 gap-[2px] sm:gap-[3px]">
                       {weeks.map((week, wi) => {
                         const day = week[di];
-                        const inYear = day.date.getFullYear() === year;
-                        const dateStr = day.date.toISOString().split("T")[0];
+                        const inRange = day.date >= heatmapStart && day.date <= heatmapEnd;
+                        const dateStr = toLocalDateStr(day.date);
+                        const isFuture = dateStr > toLocalDateStr(new Date());
                         return (
                           <div
                             key={wi}
                             className={`rounded-[1px] sm:rounded-sm ${
-                              inYear
+                              inRange && !isFuture
                                 ? getHeatColor(day.count)
                                 : "bg-transparent"
-                            } ${inYear ? "cursor-pointer" : ""}`}
+                            } ${inRange && !isFuture ? "cursor-pointer" : ""}`}
                             style={{
                               width: `${100 / weeks.length}%`,
                               paddingBottom: `${100 / weeks.length}%`,
                               flexShrink: 0,
                             }}
                             onMouseEnter={(e) => {
-                              if (!inYear) return;
+                              if (!inRange || isFuture) return;
                               const rect = e.currentTarget.getBoundingClientRect();
                               setTooltip({
                                 text: `${day.count}篇贡献度：${dateStr}`,
@@ -349,7 +355,7 @@ export default function DashboardPage() {
             {/* 月度汇总 — 横向滑动 */}
             <div className="mt-4 pt-4 border-t border-border">
               <p className="text-xs text-muted-foreground mb-2">
-                {year} 年月度分布
+                {data.isCurrentYear ? "最近一年" : `${year} 年`}月度分布
               </p>
               <div className="overflow-x-auto touch-pan-x scroll-smooth">
                 <div className="flex items-end gap-1 h-16 min-w-[400px]">
@@ -366,10 +372,18 @@ export default function DashboardPage() {
                         style={{
                           height: `${Math.max((count / Math.max(...data.monthCounts, 1)) * 48, count > 0 ? 2 : 0)}px`,
                         }}
-                        title={`${i + 1}月: ${count} 篇`}
+                        onMouseEnter={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setTooltip({
+                            text: `${data.monthLabels[i]}: ${count} 篇`,
+                            x: rect.left + rect.width / 2,
+                            y: rect.top - 8,
+                          });
+                        }}
+                        onMouseLeave={() => setTooltip(null)}
                       />
                       <span className="text-[9px] text-muted-foreground">
-                        {i + 1}月
+                        {data.monthLabels[i]}
                       </span>
                     </div>
                   ))}
@@ -391,7 +405,7 @@ export default function DashboardPage() {
                   4
                 );
                 const isToday =
-                  d.date === new Date().toISOString().split("T")[0];
+                  d.date === toLocalDateStr(new Date());
                 return (
                   <div
                     key={i}

@@ -29,6 +29,7 @@ export async function GET() {
       title: d.title,
       content: d.content,
       date: d.date.toISOString().slice(0, 10),
+      type: d.type,
       mood: d.mood,
       pinned: d.pinned,
       tags: d.tags.map((t) => t.tag.name),

@@ -7,6 +7,7 @@ const createSchema = z.object({
   title: z.string().min(1, "请输入标题").max(200, "标题最多200字"),
   content: z.string().min(1, "请输入内容"),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "日期格式不正确"),
+  type: z.enum(["diary", "daily_report"]).optional(),
   mood: z.enum(["happy", "calm", "normal", "sad", "awful"]).nullable().optional(),
   tagIds: z.array(z.string()).optional(),
 });
@@ -24,6 +25,7 @@ export async function GET(request: NextRequest) {
     tagId: searchParams.get("tagId") || undefined,
     dateFrom: searchParams.get("dateFrom") || undefined,
     dateTo: searchParams.get("dateTo") || undefined,
+    type: searchParams.get("type") || undefined,
     page: Number(searchParams.get("page")) || 1,
     pageSize: Number(searchParams.get("pageSize")) || 20,
   });
