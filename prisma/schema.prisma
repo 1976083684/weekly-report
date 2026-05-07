@@ -1,0 +1,138 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String         @id @default(cuid())
+  email          String         @unique
+  emailVerified  DateTime?
+  passwordHash   String?
+  name           String?
+  image          String?
+  accounts       Account[]
+  sessions       Session[]
+  diaries        Diary[]
+  weeklies       Weekly[]
+  tags           Tag[]
+  backupConfigs  BackupConfig[]
+  backupLogs     BackupLog[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Diary {
+  id        String    @id @default(cuid())
+  userId    String
+  title     String
+  content   String
+  date      DateTime
+  mood      String?
+  pinned    Boolean   @default(false)
+  tags      DiaryTag[]
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId, date])
+  @@index([userId, pinned])
+}
+
+model Tag {
+  id      String    @id @default(cuid())
+  userId  String
+  name    String
+  diaries DiaryTag[]
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+}
+
+model DiaryTag {
+  diaryId String
+  tagId   String
+  diary   Diary  @relation(fields: [diaryId], references: [id], onDelete: Cascade)
+  tag     Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([diaryId, tagId])
+}
+
+model Weekly {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  content   String
+  startDate DateTime
+  endDate   DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, startDate])
+}
+
+model BackupConfig {
+  id       String      @id @default(cuid())
+  userId   String
+  provider String
+  repoUrl  String
+  branch   String      @default("main")
+  path     String      @default("diary/")
+  token    String
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs     BackupLog[]
+
+  @@unique([userId, provider])
+}
+
+model BackupLog {
+  id        String       @id @default(cuid())
+  userId    String
+  configId  String
+  status    String
+  commitSha String?
+  message   String?
+  config    BackupConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
+
+  @@index([userId, createdAt])
+}
