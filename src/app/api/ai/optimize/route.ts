@@ -5,11 +5,6 @@ import { decrypt, encrypt } from "@/lib/crypto";
 import { PRESET_MODELS } from "@/lib/preset-models";
 import { z } from "zod";
 
-const PRESET_API_KEYS: Record<string, string> = {
-  zhipu: "",
-  deepseek: "sk-a378629a163f4d10918987aa7b745467",
-};
-
 const SYSTEM_PROMPTS: Record<string, string> = {
   diary: `你是一位专业的日记优化助手。你的任务是将用户的日记草稿优化为标准化、流畅的日记。
 
@@ -85,14 +80,13 @@ export async function POST(request: NextRequest) {
     // 自动创建预设模型
     const totalModels = await prisma.aIModel.count({ where: { userId: session.user.id } });
     if (totalModels === 0) {
-      for (const [key, preset] of Object.entries(PRESET_MODELS)) {
-        const apiKey = PRESET_API_KEYS[key] || "";
+      for (const [, preset] of Object.entries(PRESET_MODELS)) {
         await prisma.aIModel.create({
           data: {
             userId: session.user.id,
             provider: preset.provider,
             modelName: preset.modelName,
-            apiKey: encrypt(apiKey),
+            apiKey: encrypt(""), // 不预设 Key，需要用户自行填写
             baseUrl: preset.baseUrl,
             website: preset.website,
             notes: preset.notes,
@@ -100,7 +94,7 @@ export async function POST(request: NextRequest) {
             sonnetModel: preset.sonnetModel,
             opusModel: preset.opusModel,
             configJson: preset.configJson,
-            isActive: key === "deepseek",
+            isActive: false,
           },
         });
       }

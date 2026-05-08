@@ -8,7 +8,7 @@ import { z } from "zod";
 const modelSchema = z.object({
   provider: z.string().min(1, "供应商不能为空"),
   modelName: z.string().min(1, "模型名称不能为空"),
-  apiKey: z.string().min(1, "API Key 不能为空"),
+  apiKey: z.string(),
   baseUrl: z.string().min(1, "请求地址不能为空"),
   website: z.string().optional(),
   notes: z.string().optional(),
@@ -17,12 +17,6 @@ const modelSchema = z.object({
   opusModel: z.string().optional(),
   configJson: z.string().optional(),
 });
-
-// 预设模型对应的默认 API Key
-const PRESET_API_KEYS: Record<string, string> = {
-  zhipu: "", // 智谱 Key 需自行获取
-  deepseek: "sk-a378629a163f4d10918987aa7b745467",
-};
 
 export async function GET() {
   const session = await auth();
@@ -39,13 +33,12 @@ export async function GET() {
   if (models.length === 0) {
     const created: typeof models = [];
     for (const [key, preset] of Object.entries(PRESET_MODELS)) {
-      const apiKey = PRESET_API_KEYS[key] || "";
       const model = await prisma.aIModel.create({
         data: {
           userId: session.user.id,
           provider: preset.provider,
           modelName: preset.modelName,
-          apiKey: encrypt(apiKey),
+          apiKey: encrypt(""), // 不预设 API Key，需要用户自行填写
           baseUrl: preset.baseUrl,
           website: preset.website,
           notes: preset.notes,
@@ -53,12 +46,28 @@ export async function GET() {
           sonnetModel: preset.sonnetModel,
           opusModel: preset.opusModel,
           configJson: preset.configJson,
-          isActive: key === "deepseek", // 默认启用 DeepSeek（Key 已配置）
+          isActive: false, // 需要用户配置 Key 后手动启用
         },
       });
       created.push(model);
     }
     models = created;
+  }
+
+  function parseUsageBalance(configJson: string | null) {
+    if (!configJson) return { enabled: false, lastChecked: null, remaining: "", unit: "", error: null };
+    try {
+      const obj = JSON.parse(configJson);
+      const uc = obj.usageCheck;
+      if (!uc || !uc.enabled) return { enabled: false, lastChecked: null, remaining: "", unit: "", error: null };
+      return {
+        enabled: true,
+        lastChecked: uc.lastChecked || null,
+        remaining: uc.lastRemaining !== undefined && uc.lastRemaining !== null ? String(uc.lastRemaining) : "",
+        unit: uc.lastUnit || "",
+        error: uc.lastError || null,
+      };
+    } catch { return { enabled: false, lastChecked: null, remaining: "", unit: "", error: null }; }
   }
 
   const safeModels = models.map((m) => ({
@@ -74,6 +83,7 @@ export async function GET() {
     configJson: m.configJson,
     isActive: m.isActive,
     hasKey: decryptSafe(m.apiKey).length > 0,
+    usageBalance: parseUsageBalance(m.configJson),
     createdAt: m.createdAt,
     updatedAt: m.updatedAt,
   }));

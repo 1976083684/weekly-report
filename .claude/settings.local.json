@@ -38,7 +38,28 @@
       "Bash(taskkill /PID 35956 /F)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3100/weekly)",
       "Bash(cmd //c \"TASKKILL /F /PID 35956\")",
-      "Bash(npm ls *)"
+      "Bash(npm ls *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(npm run *)",
+      "Bash(sqlite3 dev.db \".tables\")",
+      "Bash(git pull *)",
+      "Bash(git stash *)",
+      "Bash(node *)",
+      "Bash(curl -s http://localhost:3000/api/health)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)",
+      "Bash(taskkill //F //IM \"node.exe\")",
+      "Bash(curl -s http://localhost:3000/api/settings/models)",
+      "Bash(curl *)",
+      "Bash(taskkill /F /PID 48436)",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(rm -rf .next/dev/logs)",
+      "Bash(netstat -ano)",
+      "Bash(powershell -Command \"Stop-Process -Id 48436 -Force\")",
+      "Bash(powershell -Command \"Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force\")",
+      "Bash(powershell -Command \"Stop-Process -Name node -Force -ErrorAction SilentlyContinue\")",
+      "Bash(sqlite3 dev.db \"SELECT id, username, email, phone, name FROM User;\")"
     ]
   }
 }

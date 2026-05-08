@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { parseLocalDate } from "@/lib/utils";
 
 export type DiaryWithTags = Prisma.DiaryGetPayload<{
   include: { tags: { include: { tag: true } } };
@@ -41,8 +42,8 @@ export async function getDiaries({
 
   if (dateFrom || dateTo) {
     where.date = {};
-    if (dateFrom) where.date.gte = new Date(dateFrom);
-    if (dateTo) where.date.lte = new Date(dateTo);
+    if (dateFrom) where.date.gte = parseLocalDate(dateFrom);
+    if (dateTo) where.date.lte = parseLocalDate(dateTo);
   }
 
   const [diaries, total] = await Promise.all([
@@ -80,7 +81,7 @@ export async function createDiary(data: {
       userId: data.userId,
       title: data.title,
       content: data.content,
-      date: new Date(data.date),
+      date: parseLocalDate(data.date),
       type: data.type,
       mood: data.mood,
       tags: data.tagIds?.length
@@ -119,7 +120,7 @@ export async function updateDiary(
     data: {
       title: data.title,
       content: data.content,
-      date: data.date ? new Date(data.date) : undefined,
+      date: data.date ? parseLocalDate(data.date) : undefined,
       mood: data.mood,
     },
     include: { tags: { include: { tag: true } } },

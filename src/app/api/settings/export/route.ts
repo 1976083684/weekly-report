@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { toLocalDateStr } from "@/lib/utils";
 
 export async function GET() {
   const session = await auth();
@@ -28,7 +29,7 @@ export async function GET() {
     diaries: diaries.map((d) => ({
       title: d.title,
       content: d.content,
-      date: d.date.toISOString().slice(0, 10),
+      date: toLocalDateStr(d.date),
       type: d.type,
       mood: d.mood,
       pinned: d.pinned,
@@ -37,8 +38,8 @@ export async function GET() {
     weeklies: weeklies.map((w) => ({
       title: w.title,
       content: w.content,
-      startDate: w.startDate.toISOString().slice(0, 10),
-      endDate: w.endDate.toISOString().slice(0, 10),
+      startDate: toLocalDateStr(w.startDate),
+      endDate: toLocalDateStr(w.endDate),
     })),
     tags: tags.map((t) => t.name),
   };

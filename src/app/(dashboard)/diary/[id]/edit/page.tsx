@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { getDiaryById } from "@/lib/diary";
 import { notFound } from "next/navigation";
 import { DiaryForm } from "@/components/diary/DiaryForm";
+import { toLocalDateStr } from "@/lib/utils";
 
 export default async function EditDiaryPage({
   params,
@@ -21,7 +22,7 @@ export default async function EditDiaryPage({
         id: diary.id,
         title: diary.title,
         content: diary.content,
-        date: diary.date.toISOString().slice(0, 10),
+        date: toLocalDateStr(diary.date),
         mood: diary.mood,
         tags: diary.tags.map((dt) => ({ tag: dt.tag })),
       }}

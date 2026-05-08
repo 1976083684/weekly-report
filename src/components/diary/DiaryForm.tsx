@@ -11,11 +11,12 @@ import { TagInput } from "@/components/editor/TagInput";
 import { AiOptimizeButton } from "@/components/ai/AiOptimizeButton";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/toast";
+import { todayStr, parseLocalDate } from "@/lib/utils";
 
 const weekLabels = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 
 function defaultTitle(date: string): string {
-  const d = new Date(date + "T00:00:00");
+  const d = parseLocalDate(date);
   return `${weekLabels[d.getDay()]} ${date} 日记`;
 }
 
@@ -41,7 +42,7 @@ export function DiaryForm({ initialData }: DiaryFormProps) {
   const [title, setTitle] = useState(initialData?.title || "");
   const [content, setContent] = useState(initialData?.content || "");
   const [date, setDate] = useState(
-    initialData?.date || new Date().toISOString().slice(0, 10)
+    initialData?.date || todayStr()
   );
   const [mood, setMood] = useState(initialData?.mood || null);
   const [tags, setTags] = useState<Tag[]>(

@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { getWeeklyById } from "@/lib/weekly";
 import { notFound } from "next/navigation";
 import { EditWeeklyForm } from "./EditWeeklyForm";
+import { toLocalDateStr } from "@/lib/utils";
 
 export default async function EditWeeklyPage({
   params,
@@ -20,8 +21,8 @@ export default async function EditWeeklyPage({
       id={weekly.id}
       initialTitle={weekly.title}
       initialContent={weekly.content}
-      initialStartDate={weekly.startDate.toISOString().slice(0, 10)}
-      initialEndDate={weekly.endDate.toISOString().slice(0, 10)}
+      initialStartDate={toLocalDateStr(weekly.startDate)}
+      initialEndDate={toLocalDateStr(weekly.endDate)}
     />
   );
 }

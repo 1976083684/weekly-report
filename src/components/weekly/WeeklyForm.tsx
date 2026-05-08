@@ -8,7 +8,7 @@ import { TagInput } from "@/components/editor/TagInput";
 import { AiOptimizeButton } from "@/components/ai/AiOptimizeButton";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/toast";
-import { cn } from "@/lib/utils";
+import { cn, toLocalDateStr, todayStr } from "@/lib/utils";
 
 function getWeekDates() {
   const now = new Date();
@@ -23,7 +23,7 @@ function getWeekDates() {
     d.setDate(monday.getDate() + i);
     days.push({
       label: weekLabels[i],
-      date: d.toISOString().slice(0, 10),
+      date: toLocalDateStr(d),
     });
   }
   return days;
@@ -38,7 +38,7 @@ interface DiaryData {
 
 export function WeeklyForm() {
   const weekDays = getWeekDates();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayStr();
 
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [diaries, setDiaries] = useState<Map<string, DiaryData>>(new Map());

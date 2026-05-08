@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -22,7 +22,7 @@ export default function LoginPage() {
     setLoading(true);
 
     const result = await signIn("credentials", {
-      email,
+      identifier,
       password,
       redirect: false,
     });
@@ -30,7 +30,7 @@ export default function LoginPage() {
     setLoading(false);
 
     if (result?.error) {
-      setError("邮箱或密码不正确");
+      setError("邮箱/手机号或密码不正确");
     } else {
       router.push("/dashboard");
       router.refresh();
@@ -69,13 +69,13 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm text-muted-foreground mb-1.5">
-              邮箱
+              邮箱 / 手机号
             </label>
             <Input
-              type="email"
-              placeholder="your@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              placeholder="请输入邮箱或手机号"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               className="h-10 px-3.5"
               required
             />

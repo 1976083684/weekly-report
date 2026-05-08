@@ -3,13 +3,15 @@
 import { useState, useEffect } from "react";
 import { signIn, signOut } from "next-auth/react";
 import Link from "next/link";
-import { ArrowLeft, User, Globe, LogOut, Shuffle } from "lucide-react";
+import { ArrowLeft, User, Globe, LogOut, Shuffle, Phone, Check, X, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 
 interface UserData {
   id: string;
   email: string;
+  phone?: string;
   name: string;
   image?: string;
   accounts: { provider: string; providerAccountId: string }[];
@@ -17,15 +19,49 @@ interface UserData {
 
 export default function AccountPage() {
   const [user, setUser] = useState<UserData | null>(null);
+  const [editingPhone, setEditingPhone] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [phoneMsg, setPhoneMsg] = useState("");
+  const [phoneSaving, setPhoneSaving] = useState(false);
 
-  useEffect(() => {
+  const loadUser = () => {
     fetch("/api/settings")
       .then((r) => r.json())
-      .then((data) => setUser(data.user));
+      .then((data) => {
+        setUser(data.user);
+        setPhone(data.user?.phone || "");
+      });
+  };
+
+  useEffect(() => {
+    loadUser();
   }, []);
 
   const isOAuthBound = (provider: string) =>
     user?.accounts?.some((a) => a.provider === provider);
+
+  const savePhone = async () => {
+    setPhoneMsg("");
+    setPhoneSaving(true);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: phone || null }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUser(data.user);
+        setEditingPhone(false);
+        setPhoneMsg("手机号已更新");
+      } else {
+        setPhoneMsg(data.error || "更新失败");
+      }
+    } catch {
+      setPhoneMsg("网络错误，请稍后重试");
+    }
+    setPhoneSaving(false);
+  };
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -47,7 +83,53 @@ export default function AccountPage() {
               <span className="text-foreground">{user.email}</span>
               <span className="text-muted-foreground">昵称</span>
               <span className="text-foreground">{user.name}</span>
+              <span className="text-muted-foreground">手机号</span>
+              {editingPhone ? (
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="输入手机号"
+                    className="h-7 text-sm w-36"
+                  />
+                  <button
+                    type="button"
+                    onClick={savePhone}
+                    disabled={phoneSaving}
+                    className="inline-flex items-center justify-center h-7 w-7 rounded text-success hover:bg-success/10"
+                    title="保存"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setEditingPhone(false); setPhone(user.phone || ""); setPhoneMsg(""); }}
+                    className="inline-flex items-center justify-center h-7 w-7 rounded text-muted-foreground hover:text-foreground"
+                    title="取消"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-foreground">{user.phone || "未绑定"}</span>
+                  <button
+                    type="button"
+                    onClick={() => { setEditingPhone(true); setPhoneMsg(""); }}
+                    className="inline-flex items-center justify-center h-6 w-6 rounded text-muted-foreground hover:text-foreground transition-colors"
+                    title="绑定/修改手机号"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
             </div>
+            {phoneMsg && (
+              <p className={`text-xs ${phoneMsg.includes("失败") || phoneMsg.includes("错误") || phoneMsg.includes("已被") ? "text-danger" : "text-success"}`}>
+                {phoneMsg}
+              </p>
+            )}
             <Separator />
             <div className="space-y-2">
               <div className="flex items-center justify-between">

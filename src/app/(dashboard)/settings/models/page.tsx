@@ -7,23 +7,26 @@ import {
   Plus,
   Trash2,
   Play,
-  Check,
   Loader2,
   Cpu,
   AlertCircle,
   ExternalLink,
-  Eye,
-  EyeOff,
   Settings2,
-  Power,
-  PowerOff,
-  ChevronDown,
-  ChevronUp,
+  Check,
+  Pencil,
+  Copy,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 import { PRESET_LIST, PRESET_MODELS } from "@/lib/preset-models";
+
+interface UsageBalance {
+  enabled: boolean;
+  lastChecked: string | null;
+  remaining: string;
+  unit: string;
+  error: string | null;
+}
 
 interface ModelData {
   id: string;
@@ -32,12 +35,10 @@ interface ModelData {
   baseUrl: string;
   website?: string;
   notes?: string;
-  haikuModel?: string | null;
-  sonnetModel?: string | null;
-  opusModel?: string | null;
-  configJson?: string | null;
   isActive: boolean;
   hasKey: boolean;
+  configJson?: string | null;
+  usageBalance?: UsageBalance | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -45,26 +46,24 @@ interface ModelData {
 export default function ModelsPage() {
   const [models, setModels] = useState<ModelData[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Preset selection
   const [showPresets, setShowPresets] = useState(false);
-
-  // Add form (manual)
   const [showAdd, setShowAdd] = useState(false);
   const [addError, setAddError] = useState("");
   const [adding, setAdding] = useState(false);
-
-  // Test states
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, { ok: boolean; text: string }>>({});
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [refreshingId, setRefreshingId] = useState<string | null>(null);
 
-  // Edit states
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editApiKey, setEditApiKey] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  // Expand config
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  function timeAgo(isoStr: string): string {
+    const diff = Date.now() - new Date(isoStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "刚刚";
+    if (mins < 60) return `${mins} 分钟前`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours} 小时前`;
+    return `${Math.floor(hours / 24)} 天前`;
+  }
 
   const fetchModels = async () => {
     const res = await fetch("/api/settings/models");
@@ -89,7 +88,7 @@ export default function ModelsPage() {
       body: JSON.stringify({
         provider: preset.provider,
         modelName: preset.modelName,
-        apiKey: "placeholder", // 后续通过修改 API Key 设置
+        apiKey: "",
         baseUrl: preset.baseUrl,
         website: preset.website,
         notes: preset.notes,
@@ -109,34 +108,12 @@ export default function ModelsPage() {
     setAdding(false);
   };
 
-  const saveApiKey = async (id: string) => {
-    setSaving(true);
+  const toggleActive = async (id: string, currentActive: boolean) => {
     await fetch(`/api/settings/models/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ apiKey: editApiKey }),
+      body: JSON.stringify({ isActive: !currentActive }),
     });
-    setEditingId(null);
-    setEditApiKey("");
-    setSaving(false);
-    fetchModels();
-  };
-
-  const toggleActive = async (id: string, currentActive: boolean) => {
-    if (currentActive) {
-      // 取消激活
-      await fetch(`/api/settings/models/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isActive: false }),
-      });
-    } else {
-      await fetch(`/api/settings/models/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isActive: true }),
-      });
-    }
     fetchModels();
   };
 
@@ -144,6 +121,66 @@ export default function ModelsPage() {
     if (!confirm(`确定删除模型「${name}」？`)) return;
     await fetch(`/api/settings/models/${id}`, { method: "DELETE" });
     fetchModels();
+  };
+
+  const refreshBalance = async (id: string) => {
+    setRefreshingId(id);
+    const model = models.find((m) => m.id === id);
+    if (!model) { setRefreshingId(null); return; }
+
+    const res = await fetch("/api/settings/models");
+    const data = await res.json();
+    const full = (data.models || []).find((m: ModelData) => m.id === id);
+    let uc: { block?: string; timeout?: number } = {};
+    try {
+      if (full?.configJson) {
+        const obj = JSON.parse(full.configJson as unknown as string);
+        uc = obj.usageCheck || {};
+      }
+    } catch { /* ignore */ }
+
+    const DEFAULT_FALLBACK_BLOCK = `({
+  request: {
+    url: "{{baseUrl}}/user/balance",
+    method: "GET",
+    headers: {
+      "Authorization": "Bearer {{apiKey}}",
+      "User-Agent": "cc-switch/1.0"
+    }
+  },
+  extractor: function(response) {
+    var info = (response.balance_infos && response.balance_infos[0]) || {};
+    return {
+      remaining: info.total_balance || response.total_balance || response.balance || "",
+      unit: info.currency || response.unit || ""
+    };
+  }
+})`;
+
+    const block = uc.block || DEFAULT_FALLBACK_BLOCK;
+    let parsed: { request?: { url?: string; method?: string; headers?: Record<string, string> }; extractor?: unknown } = {};
+    try {
+      const fn = new Function(`"use strict"; return ${block};`);
+      parsed = fn();
+    } catch { /* ignore */ }
+
+    const req = parsed.request || {};
+    const extractorStr = typeof parsed.extractor === "function" ? parsed.extractor.toString() : "";
+
+    await fetch(`/api/settings/models/${id}/usage-test`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: req.url || "",
+        method: req.method || "GET",
+        headers: req.headers || {},
+        extractor: extractorStr,
+        timeout: uc.timeout || 10,
+        saveResult: true,
+      }),
+    });
+    fetchModels();
+    setRefreshingId(null);
   };
 
   const testModel = async (id: string) => {
@@ -166,6 +203,13 @@ export default function ModelsPage() {
     setTestingId(null);
   };
 
+  const copyModelConfig = async (model: ModelData) => {
+    setCopiedId(model.id);
+    await fetch(`/api/settings/models/${model.id}/copy`, { method: "POST" });
+    fetchModels();
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <Link
@@ -184,7 +228,6 @@ export default function ModelsPage() {
         </Button>
       </div>
 
-      {/* Preset selection */}
       {showPresets && (
         <section className="bg-card rounded-xl border border-border p-4 space-y-3">
           <h2 className="font-medium text-sm flex items-center gap-2">
@@ -234,11 +277,9 @@ export default function ModelsPage() {
         </section>
       )}
 
-      {/* Manual add form */}
       {showAdd && (
         <section className="bg-card rounded-xl border border-border p-4 space-y-3">
           <h2 className="font-medium text-sm">手动添加模型</h2>
-          {/* Manual form omitted for brevity - using preset is the primary flow */}
           <p className="text-xs text-muted-foreground">请通过预设模型添加，或联系管理员。</p>
         </section>
       )}
@@ -258,7 +299,6 @@ export default function ModelsPage() {
       ) : (
         <div className="space-y-3">
           {models.map((model) => {
-            const isExpanded = expandedId === model.id;
             const testResult = testResults[model.id];
             return (
               <div
@@ -267,25 +307,13 @@ export default function ModelsPage() {
                   model.isActive ? "border-primary/40" : "border-border"
                 } p-4 space-y-3`}
               >
-                {/* Header */}
                 <div className="flex items-start justify-between">
-                  <div className="space-y-1">
+                  <div className="space-y-1 flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-medium text-sm">
-                        {model.provider}
-                      </h3>
+                      <h3 className="font-medium text-sm">{model.provider}</h3>
                       <span className="text-xs text-muted-foreground font-mono">
                         {model.modelName}
                       </span>
-                      {model.isActive ? (
-                        <span className="px-1.5 py-0.5 rounded-md bg-success/10 text-success text-xs inline-flex items-center gap-1">
-                          <Power className="w-3 h-3" /> 已启用
-                        </span>
-                      ) : (
-                        <span className="px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground text-xs inline-flex items-center gap-1">
-                          <PowerOff className="w-3 h-3" /> 未启用
-                        </span>
-                      )}
                     </div>
                     {model.notes && (
                       <p className="text-xs text-muted-foreground">{model.notes}</p>
@@ -302,7 +330,75 @@ export default function ModelsPage() {
                       </a>
                     )}
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 shrink-0">
+                    {model.usageBalance?.enabled && (
+                      <div className="flex flex-col items-end text-xs mr-2">
+                        {/* 第一行：时间与刷新 */}
+                        <div className="flex items-center gap-1">
+                          <span className="text-muted-foreground">
+                            {model.usageBalance.lastChecked ? timeAgo(model.usageBalance.lastChecked) : "未查询"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => refreshBalance(model.id)}
+                            disabled={refreshingId === model.id}
+                            className="inline-flex items-center text-muted-foreground hover:text-foreground transition-colors"
+                            title="刷新余额"
+                          >
+                            <RefreshCw className={`w-3 h-3 ${refreshingId === model.id ? "animate-spin" : ""}`} />
+                          </button>
+                        </div>
+                        {/* 第二行：余额数值 */}
+                        <div className="flex items-center gap-1">
+                          <span className="text-muted-foreground">剩余</span>
+                          {model.usageBalance.remaining ? (
+                            <span className="text-success font-medium">
+                              {model.usageBalance.remaining}{model.usageBalance.unit ? ` ${model.usageBalance.unit}` : ""}
+                            </span>
+                          ) : model.usageBalance.error ? (
+                            <span className="text-danger">检查配置</span>
+                          ) : (
+                            <span className="text-muted-foreground">--</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {model.isActive ? (
+                      <button
+                        disabled
+                        className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg text-xs font-medium bg-muted text-muted-foreground cursor-not-allowed"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        使用中
+                      </button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() => toggleActive(model.id, model.isActive)}
+                        className="h-8 text-xs"
+                      >
+                        启用此模型
+                      </Button>
+                    )}
+                    <Link
+                      href={`/settings/models/${model.id}`}
+                      className="inline-flex items-center justify-center h-8 px-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                      title="编辑"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => copyModelConfig(model)}
+                      className="inline-flex items-center justify-center h-8 px-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                      title="复制配置"
+                    >
+                      {copiedId === model.id ? (
+                        <Check className="w-3.5 h-3.5 text-success" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                    </button>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -329,7 +425,6 @@ export default function ModelsPage() {
                   </div>
                 </div>
 
-                {/* Test result */}
                 {testResult && (
                   <div
                     className={`p-2.5 rounded-lg text-xs ${
@@ -340,115 +435,6 @@ export default function ModelsPage() {
                   >
                     {testResult.ok ? "✅ 测试通过 —— " : "❌ "}
                     {testResult.text}
-                  </div>
-                )}
-
-                {/* Model mapping */}
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div className="p-2 rounded bg-muted/50">
-                    <span className="text-muted-foreground">Haiku</span>
-                    <p className="font-mono mt-0.5 text-foreground">
-                      {model.haikuModel || "-"}
-                    </p>
-                  </div>
-                  <div className="p-2 rounded bg-muted/50">
-                    <span className="text-muted-foreground">Sonnet</span>
-                    <p className="font-mono mt-0.5 text-foreground">
-                      {model.sonnetModel || "-"}
-                    </p>
-                  </div>
-                  <div className="p-2 rounded bg-muted/50">
-                    <span className="text-muted-foreground">Opus</span>
-                    <p className="font-mono mt-0.5 text-foreground">
-                      {model.opusModel || "-"}
-                    </p>
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Actions */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  {/* API Key */}
-                  {editingId === model.id ? (
-                    <div className="flex items-center gap-1.5">
-                      <Input
-                        value={editApiKey}
-                        onChange={(e) => setEditApiKey(e.target.value)}
-                        placeholder="输入 API Key"
-                        type="password"
-                        className="h-8 w-56 text-xs"
-                        autoFocus
-                      />
-                      <Button
-                        size="sm"
-                        onClick={() => saveApiKey(model.id)}
-                        disabled={saving}
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setEditingId(null)}
-                        className="h-8 px-2 text-xs"
-                      >
-                        取消
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setEditingId(model.id);
-                        setEditApiKey("");
-                      }}
-                      className="h-8 text-xs"
-                    >
-                      {model.hasKey ? "修改 API Key" : "设置 API Key"}
-                    </Button>
-                  )}
-
-                  <Button
-                    variant={model.isActive ? "outline" : "default"}
-                    size="sm"
-                    onClick={() => toggleActive(model.id, model.isActive)}
-                    className="h-8 text-xs"
-                  >
-                    {model.isActive ? "停用" : "启用此模型"}
-                  </Button>
-
-                  {/* Expand config */}
-                  {model.configJson && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setExpandedId(isExpanded ? null : model.id)}
-                      className="h-8 text-xs text-muted-foreground"
-                    >
-                      {isExpanded ? (
-                        <ChevronUp className="w-3.5 h-3.5 mr-1" />
-                      ) : (
-                        <ChevronDown className="w-3.5 h-3.5 mr-1" />
-                      )}
-                      配置 JSON
-                    </Button>
-                  )}
-                </div>
-
-                {/* Config JSON (expandable) */}
-                {isExpanded && model.configJson && (
-                  <div className="bg-muted/50 rounded-lg p-3 overflow-auto">
-                    <pre className="text-xs text-muted-foreground whitespace-pre-wrap">
-                      {(() => {
-                        try {
-                          return JSON.stringify(JSON.parse(model.configJson), null, 2);
-                        } catch {
-                          return model.configJson;
-                        }
-                      })()}
-                    </pre>
                   </div>
                 )}
               </div>

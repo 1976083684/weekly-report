@@ -2,10 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/crypto";
 import { pushToGitHub, parseGitHubUrl } from "@/lib/github";
 import { pushToGitee, parseGiteeUrl } from "@/lib/gitee";
+import { toLocalDateStr } from "@/lib/utils";
 
-// Convert single \n to markdown hard breaks (  \n) so line breaks are
-// preserved when Gitee/GitHub renders the markdown. Paragraph breaks (\n\n)
-// are left untouched.
 function hardBreaks(text: string): string {
   return text
     .replace(/\r\n/g, "\n")
@@ -29,7 +27,7 @@ function formatDiary(diary: {
     awful: "😞 难过",
   };
   const mood = diary.mood ? `\n心情：${moodMap[diary.mood] || diary.mood}` : "";
-  return `# ${diary.title}\n日期：${diary.date.toISOString().slice(0, 10)}${mood}\n\n${hardBreaks(diary.content)}\n`;
+  return `# ${diary.title}\n日期：${toLocalDateStr(diary.date)}${mood}\n\n${hardBreaks(diary.content)}\n`;
 }
 
 function formatDailyReport(report: {
@@ -37,7 +35,7 @@ function formatDailyReport(report: {
   content: string;
   date: Date;
 }): string {
-  return `# ${report.title}\n日期：${report.date.toISOString().slice(0, 10)}\n\n${hardBreaks(report.content)}\n`;
+  return `# ${report.title}\n日期：${toLocalDateStr(report.date)}\n\n${hardBreaks(report.content)}\n`;
 }
 
 function formatWeekly(weekly: {
@@ -61,7 +59,6 @@ function getDateRange(scope: string) {
     d.setDate(d.getDate() - 30);
     return { dateFrom: d, weeklyFrom: d };
   }
-  // "all" - no filter
   return { dateFrom: undefined, weeklyFrom: undefined };
 }
 
@@ -74,7 +71,6 @@ export async function backupToGit(backupConfigId: string, userId: string, scope 
 
   const token = decrypt(config.token);
 
-  // Determine parser and pusher
   const isGitHub = config.provider === "github";
   const parseFn = isGitHub ? parseGitHubUrl : parseGiteeUrl;
   const pushFn = isGitHub ? pushToGitHub : pushToGitee;
@@ -84,7 +80,6 @@ export async function backupToGit(backupConfigId: string, userId: string, scope 
 
   const { dateFrom, weeklyFrom } = getDateRange(scope);
 
-  // Get diaries, daily reports, and weeklies with date filter
   const diaryWhere: Record<string, unknown> = { userId, type: "diary" };
   const reportWhere: Record<string, unknown> = { userId, type: "daily_report" };
   const weeklyWhere: Record<string, unknown> = { userId };
@@ -114,10 +109,9 @@ export async function backupToGit(backupConfigId: string, userId: string, scope 
   const results: string[] = [];
   const errors: string[] = [];
 
-  // Push diary files
   for (const diary of diaries) {
     try {
-      const date = diary.date.toISOString().slice(0, 10);
+      const date = toLocalDateStr(diary.date);
       const year = date.slice(0, 4);
       const filePath = `${config.path}diary/${year}/${date}.md`;
       const md = formatDiary(diary);
@@ -135,15 +129,14 @@ export async function backupToGit(backupConfigId: string, userId: string, scope 
 
       results.push(`${filePath} -> ${result.sha}`);
     } catch (err) {
-      const date = diary.date.toISOString().slice(0, 10);
+      const date = toLocalDateStr(diary.date);
       errors.push(`日记 ${date} 备份失败: ${(err as Error).message}`);
     }
   }
 
-  // Push daily report files
   for (const report of dailyReports) {
     try {
-      const date = report.date.toISOString().slice(0, 10);
+      const date = toLocalDateStr(report.date);
       const year = date.slice(0, 4);
       const filePath = `${config.path}daily-report/${year}/${date}.md`;
       const md = formatDailyReport(report);
@@ -161,16 +154,15 @@ export async function backupToGit(backupConfigId: string, userId: string, scope 
 
       results.push(`${filePath} -> ${result.sha}`);
     } catch (err) {
-      const date = report.date.toISOString().slice(0, 10);
+      const date = toLocalDateStr(report.date);
       errors.push(`日报 ${date} 备份失败: ${(err as Error).message}`);
     }
   }
 
-  // Push weekly files
   for (const weekly of weeklies) {
     try {
-      const start = weekly.startDate.toISOString().slice(0, 10);
-      const end = weekly.endDate.toISOString().slice(0, 10);
+      const start = toLocalDateStr(weekly.startDate);
+      const end = toLocalDateStr(weekly.endDate);
       const startParts = start.split("-");
       const endDay = end.split("-")[2];
       const filePath = `${config.path}weekly/${startParts[0]}/${start}~${endDay}.md`;

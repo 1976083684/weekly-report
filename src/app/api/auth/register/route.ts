@@ -11,6 +11,11 @@ const registerSchema = z.object({
     .regex(/[a-zA-Z]/, "密码需包含字母")
     .regex(/[0-9]/, "密码需包含数字"),
   name: z.string().min(1, "请输入昵称").max(30, "昵称最多30字").optional(),
+  phone: z
+    .string()
+    .regex(/^1[3-9]\d{9}$/, "手机号格式不正确")
+    .optional()
+    .or(z.literal("")),
 });
 
 export async function POST(request: NextRequest) {
@@ -18,11 +23,23 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const data = registerSchema.parse(body);
 
-    const existing = await prisma.user.findUnique({
+    const phone = data.phone || null;
+
+    // 检查邮箱和手机号唯一性
+    const existingEmail = await prisma.user.findUnique({
       where: { email: data.email },
     });
-    if (existing) {
+    if (existingEmail) {
       return NextResponse.json({ error: "该邮箱已注册" }, { status: 409 });
+    }
+
+    if (phone) {
+      const existingPhone = await prisma.user.findUnique({
+        where: { phone },
+      });
+      if (existingPhone) {
+        return NextResponse.json({ error: "该手机号已被绑定" }, { status: 409 });
+      }
     }
 
     const passwordHash = await bcrypt.hash(data.password, 12);
@@ -31,12 +48,13 @@ export async function POST(request: NextRequest) {
       data: {
         email: data.email,
         passwordHash,
+        phone,
         name: data.name || data.email.split("@")[0],
       },
     });
 
     return NextResponse.json(
-      { id: user.id, email: user.email, name: user.name },
+      { id: user.id, email: user.email, name: user.name, phone: user.phone },
       { status: 201 }
     );
   } catch (err) {

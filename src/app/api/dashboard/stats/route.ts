@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { toLocalDateStr, parseLocalDate } from "@/lib/utils";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -22,10 +23,6 @@ export async function GET(request: NextRequest) {
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
   sunday.setHours(23, 59, 59, 999);
-
-  function toLocalDateStr(d: Date): string {
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  }
 
   const mondayStr = toLocalDateStr(monday);
   const sundayStr = toLocalDateStr(sunday);
@@ -57,7 +54,7 @@ export async function GET(request: NextRequest) {
     prisma.weekly.count({ where: { userId } }),
     prisma.tag.count({ where: { userId } }),
     prisma.diary.findMany({
-      where: { userId, date: { gte: new Date(mondayStr), lte: new Date(sundayStr) } },
+      where: { userId, date: { gte: parseLocalDate(mondayStr), lte: parseLocalDate(sundayStr) } },
       select: { date: true, id: true },
     }),
     prisma.diary.findMany({
@@ -73,7 +70,7 @@ export async function GET(request: NextRequest) {
     }),
     prisma.diaryTag.findMany({
       where: {
-        diary: { userId, date: { gte: new Date(mondayStr), lte: new Date(sundayStr) } },
+        diary: { userId, date: { gte: parseLocalDate(mondayStr), lte: parseLocalDate(sundayStr) } },
       },
       include: { tag: true },
     }),
@@ -161,7 +158,7 @@ export async function GET(request: NextRequest) {
     recentDiaries: recentDiaries.map((d) => ({
       id: d.id,
       title: d.title,
-      date: d.date.toISOString().split("T")[0],
+      date: toLocalDateStr(d.date),
       tags: d.tags.map((dt) => ({ id: dt.tag.id, name: dt.tag.name })),
     })),
   });

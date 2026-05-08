@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { parseLocalDate } from "@/lib/utils";
 
 export async function getWeeklies({
   userId,
@@ -26,10 +27,10 @@ export async function getWeeklies({
   }
 
   if (startDate) {
-    where.startDate = new Date(startDate);
+    where.startDate = parseLocalDate(startDate);
   }
   if (endDate) {
-    where.endDate = new Date(endDate);
+    where.endDate = parseLocalDate(endDate);
   }
 
   const [weeklies, total] = await Promise.all([
@@ -63,8 +64,8 @@ export async function createWeekly(data: {
       userId: data.userId,
       title: data.title,
       content: data.content,
-      startDate: new Date(data.startDate),
-      endDate: new Date(data.endDate),
+      startDate: parseLocalDate(data.startDate),
+      endDate: parseLocalDate(data.endDate),
     },
   });
 }
@@ -87,8 +88,8 @@ export async function updateWeekly(
   const updateData: Record<string, unknown> = {};
   if (data.title !== undefined) updateData.title = data.title;
   if (data.content !== undefined) updateData.content = data.content;
-  if (data.startDate !== undefined) updateData.startDate = new Date(data.startDate);
-  if (data.endDate !== undefined) updateData.endDate = new Date(data.endDate);
+  if (data.startDate !== undefined) updateData.startDate = parseLocalDate(data.startDate);
+  if (data.endDate !== undefined) updateData.endDate = parseLocalDate(data.endDate);
 
   return prisma.weekly.update({
     where: { id: weeklyId },
@@ -117,8 +118,8 @@ export async function generateWeekly(
     where.id = { in: diaryIds };
   } else {
     where.date = {
-      gte: new Date(startDate),
-      lte: new Date(endDate),
+      gte: parseLocalDate(startDate),
+      lte: parseLocalDate(endDate),
     };
   }
 

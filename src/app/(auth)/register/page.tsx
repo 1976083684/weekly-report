@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -33,7 +34,7 @@ export default function RegisterPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, name }),
+        body: JSON.stringify({ email, password, name, phone: phone || undefined }),
       });
 
       const data = await res.json();
@@ -104,6 +105,20 @@ export default function RegisterPage() {
               onChange={(e) => setEmail(e.target.value)}
               className="h-10 px-3.5"
               required
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-muted-foreground mb-1.5">
+              手机号
+              <span className="text-muted-foreground/60 ml-1">（选填，绑定后可用手机号登录）</span>
+            </label>
+            <Input
+              type="tel"
+              placeholder="输入手机号（可选）"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="h-10 px-3.5"
+              maxLength={11}
             />
           </div>
           <div>
