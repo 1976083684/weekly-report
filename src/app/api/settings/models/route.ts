@@ -134,7 +134,9 @@ export async function POST(request: NextRequest) {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: err.issues[0].message }, { status: 400 });
     }
-    return NextResponse.json({ error: "添加模型失败" }, { status: 500 });
+    console.error("[models] POST error:", err);
+    const message = err instanceof Error ? err.message : "添加模型失败";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
