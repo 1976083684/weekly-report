@@ -1,20 +1,41 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Feather, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+const OAUTH_ERRORS: Record<string, string> = {
+  OAuthSignin: "第三方登录初始化失败，请检查配置",
+  OAuthCallback: "第三方登录回调失败，请重试",
+  OAuthCreateAccount: "创建第三方账号失败",
+  EmailCreateAccount: "创建邮箱账号失败",
+  Callback: "登录回调失败，请重试",
+  OAuthAccountNotLinked: "该邮箱已绑定其他登录方式，请使用原方式登录",
+  EmailSignin: "邮箱验证码发送失败",
+  CredentialsSignin: "邮箱/手机号或密码不正确",
+  SessionRequired: "请先登录",
+  default: "登录失败，请重试",
+};
+
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const errorCode = searchParams?.get("error");
+    if (errorCode) {
+      setError(OAUTH_ERRORS[errorCode] || OAUTH_ERRORS.default);
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

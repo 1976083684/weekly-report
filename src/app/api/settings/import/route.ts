@@ -21,6 +21,26 @@ const importSchema = z.object({
     endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   })).optional().default([]),
   tags: z.array(z.string()).optional().default([]),
+  backupConfigs: z.array(z.object({
+    provider: z.string().min(1),
+    repoUrl: z.string().min(1),
+    branch: z.string().default("main"),
+    path: z.string().default("diary/"),
+    token: z.string(),
+  })).optional().default([]),
+  aiModels: z.array(z.object({
+    provider: z.string().min(1),
+    modelName: z.string().min(1),
+    apiKey: z.string(),
+    baseUrl: z.string().min(1),
+    website: z.string().nullable().optional(),
+    notes: z.string().nullable().optional(),
+    haikuModel: z.string().nullable().optional(),
+    sonnetModel: z.string().nullable().optional(),
+    opusModel: z.string().nullable().optional(),
+    configJson: z.string().nullable().optional(),
+    isActive: z.boolean().optional().default(false),
+  })).optional().default([]),
 });
 
 export async function POST(request: NextRequest) {
@@ -61,6 +81,10 @@ export async function POST(request: NextRequest) {
     let diariesSkipped = 0;
     let weekliesImported = 0;
     let weekliesSkipped = 0;
+    let backupsImported = 0;
+    let backupsUpdated = 0;
+    let modelsImported = 0;
+    let modelsUpdated = 0;
 
     // 1. Import tags — find or create by name for current user
     const tagNameToId = new Map<string, string>();
@@ -136,6 +160,94 @@ export async function POST(request: NextRequest) {
       weekliesImported++;
     }
 
+    // 4. Import backup configs — upsert by userId + provider
+    for (const cfg of data.backupConfigs) {
+      const existing = await prisma.backupConfig.findUnique({
+        where: { userId_provider: { userId, provider: cfg.provider } },
+      });
+      if (existing) {
+        await prisma.backupConfig.update({
+          where: { id: existing.id },
+          data: {
+            repoUrl: cfg.repoUrl,
+            branch: cfg.branch,
+            path: cfg.path,
+            token: cfg.token,
+          },
+        });
+        backupsUpdated++;
+      } else {
+        await prisma.backupConfig.create({
+          data: {
+            userId,
+            provider: cfg.provider,
+            repoUrl: cfg.repoUrl,
+            branch: cfg.branch,
+            path: cfg.path,
+            token: cfg.token,
+          },
+        });
+        backupsImported++;
+      }
+    }
+
+    // 5. Import AI models — upsert by userId + provider + modelName
+    for (const m of data.aiModels) {
+      const existing = await prisma.aIModel.findUnique({
+        where: {
+          userId_provider_modelName: {
+            userId,
+            provider: m.provider,
+            modelName: m.modelName,
+          },
+        },
+      });
+      if (existing) {
+        await prisma.aIModel.update({
+          where: { id: existing.id },
+          data: {
+            apiKey: m.apiKey,
+            baseUrl: m.baseUrl,
+            website: m.website ?? null,
+            notes: m.notes ?? null,
+            haikuModel: m.haikuModel ?? null,
+            sonnetModel: m.sonnetModel ?? null,
+            opusModel: m.opusModel ?? null,
+            configJson: m.configJson ?? null,
+            isActive: m.isActive,
+          },
+        });
+        modelsUpdated++;
+      } else {
+        await prisma.aIModel.create({
+          data: {
+            userId,
+            provider: m.provider,
+            modelName: m.modelName,
+            apiKey: m.apiKey,
+            baseUrl: m.baseUrl,
+            website: m.website ?? null,
+            notes: m.notes ?? null,
+            haikuModel: m.haikuModel ?? null,
+            sonnetModel: m.sonnetModel ?? null,
+            opusModel: m.opusModel ?? null,
+            configJson: m.configJson ?? null,
+            isActive: false, // 导入后默认不激活，需手动启用
+          },
+        });
+        modelsImported++;
+      }
+    }
+
+    const parts: string[] = [];
+    if (tagsImported > 0) parts.push(`标签：${tagsImported} 个新增`);
+    if (diariesImported > 0 || diariesSkipped > 0) parts.push(`日记：${diariesImported} 篇导入，${diariesSkipped} 篇跳过`);
+    if (weekliesImported > 0 || weekliesSkipped > 0) parts.push(`周报：${weekliesImported} 篇导入，${weekliesSkipped} 篇跳过`);
+    if (backupsImported > 0) parts.push(`备份配置：${backupsImported} 个新增`);
+    if (backupsUpdated > 0) parts.push(`备份配置：${backupsUpdated} 个更新`);
+    if (modelsImported > 0) parts.push(`模型配置：${modelsImported} 个新增`);
+    if (modelsUpdated > 0) parts.push(`模型配置：${modelsUpdated} 个更新`);
+
     return NextResponse.json({
       success: true,
       tagsImported,
@@ -143,11 +255,11 @@ export async function POST(request: NextRequest) {
       diariesSkipped,
       weekliesImported,
       weekliesSkipped,
-      message: [
-        `标签：${tagsImported} 个新增`,
-        `日记：${diariesImported} 篇导入，${diariesSkipped} 篇跳过（重复）`,
-        `周报：${weekliesImported} 篇导入，${weekliesSkipped} 篇跳过（重复）`,
-      ].join("；"),
+      backupsImported,
+      backupsUpdated,
+      modelsImported,
+      modelsUpdated,
+      message: parts.length > 0 ? parts.join("；") : "没有可导入的数据",
     });
   } catch (err) {
     return NextResponse.json({

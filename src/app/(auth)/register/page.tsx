@@ -34,7 +34,7 @@ export default function RegisterPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, name, phone: phone || undefined }),
+        body: JSON.stringify({ phone, password, name, email: email || undefined }),
       });
 
       const data = await res.json();
@@ -96,29 +96,29 @@ export default function RegisterPage() {
           </div>
           <div>
             <label className="block text-sm text-muted-foreground mb-1.5">
-              邮箱
+              手机号
             </label>
             <Input
-              type="email"
-              placeholder="your@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="tel"
+              placeholder="请输入手机号"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
               className="h-10 px-3.5"
+              maxLength={11}
               required
             />
           </div>
           <div>
             <label className="block text-sm text-muted-foreground mb-1.5">
-              手机号
-              <span className="text-muted-foreground/60 ml-1">（选填，绑定后可用手机号登录）</span>
+              邮箱
+              <span className="text-muted-foreground/60 ml-1">（选填）</span>
             </label>
             <Input
-              type="tel"
-              placeholder="输入手机号（可选）"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              type="email"
+              placeholder="your@email.com（选填）"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="h-10 px-3.5"
-              maxLength={11}
             />
           </div>
           <div>

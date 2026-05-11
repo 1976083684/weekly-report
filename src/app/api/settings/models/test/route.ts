@@ -1,48 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { decrypt } from "@/lib/crypto";
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
   }
 
-  const { id } = await params;
-
-  const model = await prisma.aIModel.findUnique({
-    where: { id },
-    select: { userId: true, apiKey: true, baseUrl: true, modelName: true },
-  });
-
-  if (!model || model.userId !== session.user.id) {
-    return NextResponse.json({ error: "模型不存在" }, { status: 404 });
-  }
-
-  let apiKey: string;
   try {
-    apiKey = decrypt(model.apiKey);
-  } catch {
-    return NextResponse.json({ error: "API Key 解密失败" }, { status: 500 });
-  }
+    const { baseUrl, apiKey, modelName } = await request.json();
 
-  if (!apiKey) {
-    return NextResponse.json({ error: "请先设置 API Key" }, { status: 400 });
-  }
+    if (!baseUrl || !apiKey || !modelName) {
+      return NextResponse.json({ error: "缺少必要参数" }, { status: 400 });
+    }
 
-  try {
-    const resp = await fetch(`${model.baseUrl}/chat/completions`, {
+    const resp = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json; charset=utf-8",
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: model.modelName,
+        model: modelName,
         messages: [{ role: "user", content: "Hello" }],
         max_tokens: 10,
       }),

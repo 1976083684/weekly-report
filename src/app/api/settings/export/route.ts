@@ -9,7 +9,7 @@ export async function GET() {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
   }
 
-  const [diaries, weeklies, tags] = await Promise.all([
+  const [diaries, weeklies, tags, backupConfigs, aiModels] = await Promise.all([
     prisma.diary.findMany({
       where: { userId: session.user.id },
       include: { tags: { include: { tag: true } } },
@@ -20,6 +20,12 @@ export async function GET() {
       orderBy: { startDate: "desc" },
     }),
     prisma.tag.findMany({
+      where: { userId: session.user.id },
+    }),
+    prisma.backupConfig.findMany({
+      where: { userId: session.user.id },
+    }),
+    prisma.aIModel.findMany({
       where: { userId: session.user.id },
     }),
   ]);
@@ -42,6 +48,26 @@ export async function GET() {
       endDate: toLocalDateStr(w.endDate),
     })),
     tags: tags.map((t) => t.name),
+    backupConfigs: backupConfigs.map((c) => ({
+      provider: c.provider,
+      repoUrl: c.repoUrl,
+      branch: c.branch,
+      path: c.path,
+      token: c.token,
+    })),
+    aiModels: aiModels.map((m) => ({
+      provider: m.provider,
+      modelName: m.modelName,
+      apiKey: m.apiKey,
+      baseUrl: m.baseUrl,
+      website: m.website,
+      notes: m.notes,
+      haikuModel: m.haikuModel,
+      sonnetModel: m.sonnetModel,
+      opusModel: m.opusModel,
+      configJson: m.configJson,
+      isActive: m.isActive,
+    })),
   };
 
   return NextResponse.json(data, {

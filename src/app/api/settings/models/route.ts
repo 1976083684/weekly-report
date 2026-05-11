@@ -54,6 +54,27 @@ export async function GET() {
     models = created;
   }
 
+  // 自动修复已有智谱模型的 usageCheck 配置（若无或过时则更新）
+  for (const model of models) {
+    if (model.provider === "智谱AI" && model.baseUrl === PRESET_MODELS.zhipu.baseUrl) {
+      let configObj: Record<string, unknown> = {};
+      try { if (model.configJson) configObj = JSON.parse(model.configJson); } catch { /* keep */ }
+      const uc = configObj.usageCheck as Record<string, unknown> | undefined;
+      const block = (uc?.block as string) || "";
+      // 未配置或仍使用旧的 monitor/balance 端点时自动更新
+      if (!uc || block.includes("monitor") || block.includes("/user/balance")) {
+        const presetConfig = JSON.parse(PRESET_MODELS.zhipu.configJson);
+        configObj.usageCheck = presetConfig.usageCheck;
+        const updatedJson = JSON.stringify(configObj);
+        await prisma.aIModel.update({
+          where: { id: model.id },
+          data: { configJson: updatedJson },
+        });
+        model.configJson = updatedJson;
+      }
+    }
+  }
+
   function parseUsageBalance(configJson: string | null) {
     if (!configJson) return { enabled: false, lastChecked: null, remaining: "", unit: "", error: null };
     try {

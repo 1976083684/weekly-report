@@ -8,17 +8,16 @@ import {
   Trash2,
   Play,
   Loader2,
-  Cpu,
-  AlertCircle,
   ExternalLink,
-  Settings2,
   Check,
   Pencil,
   Copy,
   RefreshCw,
+  Cpu,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PRESET_LIST, PRESET_MODELS } from "@/lib/preset-models";
+import { PRESET_MODELS } from "@/lib/preset-models";
 
 interface UsageBalance {
   enabled: boolean;
@@ -46,10 +45,6 @@ interface ModelData {
 export default function ModelsPage() {
   const [models, setModels] = useState<ModelData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showPresets, setShowPresets] = useState(false);
-  const [showAdd, setShowAdd] = useState(false);
-  const [addError, setAddError] = useState("");
-  const [adding, setAdding] = useState(false);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, { ok: boolean; text: string }>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -75,38 +70,6 @@ export default function ModelsPage() {
   useEffect(() => {
     fetchModels();
   }, []);
-
-  const addPresetModel = async (presetKey: string) => {
-    const preset = PRESET_MODELS[presetKey];
-    if (!preset) return;
-    setAdding(true);
-    setAddError("");
-
-    const res = await fetch("/api/settings/models", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        provider: preset.provider,
-        modelName: preset.modelName,
-        apiKey: "",
-        baseUrl: preset.baseUrl,
-        website: preset.website,
-        notes: preset.notes,
-        haikuModel: preset.haikuModel,
-        sonnetModel: preset.sonnetModel,
-        opusModel: preset.opusModel,
-        configJson: preset.configJson,
-      }),
-    });
-    const data = await res.json();
-    if (data.error) {
-      setAddError(data.error);
-    } else {
-      setShowPresets(false);
-      fetchModels();
-    }
-    setAdding(false);
-  };
 
   const toggleActive = async (id: string, currentActive: boolean) => {
     await fetch(`/api/settings/models/${id}`, {
@@ -222,24 +185,29 @@ export default function ModelsPage() {
 
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-foreground">模型配置</h1>
-        <Button size="sm" onClick={() => setShowPresets(!showPresets)}>
-          <Plus className="w-3.5 h-3.5 mr-1" />
-          添加模型
-        </Button>
+        <Link href="/settings/models/new">
+          <Button size="sm">
+            <Plus className="w-3.5 h-3.5 mr-1" />
+            添加模型
+          </Button>
+        </Link>
       </div>
 
-      {showPresets && (
+      {loading ? (
+        <p className="text-muted-foreground text-sm text-center py-8">加载中...</p>
+      ) : models.length === 0 ? (
         <section className="bg-card rounded-xl border border-border p-4 space-y-3">
           <h2 className="font-medium text-sm flex items-center gap-2">
-            <Cpu className="w-4 h-4 text-muted-foreground" /> 选择预设模型
+            <Cpu className="w-4 h-4 text-muted-foreground" /> 添加您的第一个模型
           </h2>
           <p className="text-xs text-muted-foreground">
-            选择一个预设模型将自动填充供应商、模型映射和配置信息，只需填写 API Key 即可使用。
+            选择供应商后将自动填充配置信息，只需填写 API Key 即可使用。
           </p>
           <div className="grid gap-3">
-            {PRESET_LIST.map((preset) => (
-              <div
-                key={preset.key}
+            {Object.entries(PRESET_MODELS).map(([key, preset]) => (
+              <Link
+                key={key}
+                href={`/settings/models/new?provider=${key}`}
                 className="flex items-center justify-between p-3 rounded-lg border border-border hover:border-primary/30 transition-colors bg-muted/30"
               >
                 <div className="space-y-0.5">
@@ -249,53 +217,11 @@ export default function ModelsPage() {
                   </div>
                   <p className="text-xs text-muted-foreground">{preset.notes}</p>
                 </div>
-                <Button
-                  size="sm"
-                  onClick={() => addPresetModel(preset.key)}
-                  disabled={adding}
-                >
-                  <Plus className="w-3.5 h-3.5 mr-1" />
-                  添加
-                </Button>
-              </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </Link>
             ))}
           </div>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setShowPresets(false);
-                setShowAdd(!showAdd);
-              }}
-              className="text-xs"
-            >
-              <Settings2 className="w-3.5 h-3.5 mr-1" />
-              手动配置其他模型
-            </Button>
-          </div>
         </section>
-      )}
-
-      {showAdd && (
-        <section className="bg-card rounded-xl border border-border p-4 space-y-3">
-          <h2 className="font-medium text-sm">手动添加模型</h2>
-          <p className="text-xs text-muted-foreground">请通过预设模型添加，或联系管理员。</p>
-        </section>
-      )}
-
-      {addError && (
-        <div className="p-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-xs flex items-center gap-1.5">
-          <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {addError}
-        </div>
-      )}
-
-      {loading ? (
-        <p className="text-muted-foreground text-sm text-center py-8">加载中...</p>
-      ) : models.length === 0 ? (
-        <p className="text-muted-foreground text-sm text-center py-8">
-          暂无模型配置，点击「添加模型」开始
-        </p>
       ) : (
         <div className="space-y-3">
           {models.map((model) => {

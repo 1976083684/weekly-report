@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 
 const registerSchema = z.object({
-  email: z.string().email("邮箱格式不正确"),
+  email: z.string().email("邮箱格式不正确").optional().or(z.literal("")),
   password: z
     .string()
     .min(8, "密码至少8位")
@@ -13,9 +13,7 @@ const registerSchema = z.object({
   name: z.string().min(1, "请输入昵称").max(30, "昵称最多30字").optional(),
   phone: z
     .string()
-    .regex(/^1[3-9]\d{9}$/, "手机号格式不正确")
-    .optional()
-    .or(z.literal("")),
+    .regex(/^1[3-9]\d{9}$/, "手机号格式不正确"),
 });
 
 export async function POST(request: NextRequest) {
@@ -23,22 +21,24 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const data = registerSchema.parse(body);
 
-    const phone = data.phone || null;
+    const email = data.email || null;
+    const phone = data.phone;
 
-    // 检查邮箱和手机号唯一性
-    const existingEmail = await prisma.user.findUnique({
-      where: { email: data.email },
+    // 检查手机号唯一性
+    const existingPhone = await prisma.user.findUnique({
+      where: { phone },
     });
-    if (existingEmail) {
-      return NextResponse.json({ error: "该邮箱已注册" }, { status: 409 });
+    if (existingPhone) {
+      return NextResponse.json({ error: "该手机号已注册" }, { status: 409 });
     }
 
-    if (phone) {
-      const existingPhone = await prisma.user.findUnique({
-        where: { phone },
+    // 如果提供了邮箱，检查邮箱唯一性
+    if (email) {
+      const existingEmail = await prisma.user.findUnique({
+        where: { email },
       });
-      if (existingPhone) {
-        return NextResponse.json({ error: "该手机号已被绑定" }, { status: 409 });
+      if (existingEmail) {
+        return NextResponse.json({ error: "该邮箱已注册" }, { status: 409 });
       }
     }
 
@@ -46,10 +46,10 @@ export async function POST(request: NextRequest) {
 
     const user = await prisma.user.create({
       data: {
-        email: data.email,
+        email,
         passwordHash,
         phone,
-        name: data.name || data.email.split("@")[0],
+        name: data.name || phone,
       },
     });
 

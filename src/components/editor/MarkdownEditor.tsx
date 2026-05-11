@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Eye, Edit3 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { VoiceInput } from "./VoiceInput";
 
 interface MarkdownEditorProps {
   value: string;
@@ -18,6 +19,22 @@ export function MarkdownEditor({
   minHeight = "300px",
 }: MarkdownEditorProps) {
   const [preview, setPreview] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleTranscript = useCallback(
+    (text: string) => {
+      const separator = value && !value.endsWith("\n") ? "\n" : "";
+      onChange(value + separator + text);
+      requestAnimationFrame(() => {
+        const ta = textareaRef.current;
+        if (ta) {
+          ta.focus();
+          ta.scrollTop = ta.scrollHeight;
+        }
+      });
+    },
+    [value, onChange],
+  );
 
   const renderMarkdown = (text: string) => {
     let html = text
@@ -53,7 +70,7 @@ export function MarkdownEditor({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 flex-wrap">
         <button
           type="button"
           onClick={() => setPreview(false)}
@@ -80,6 +97,9 @@ export function MarkdownEditor({
           <Eye className="w-3.5 h-3.5 inline mr-1" />
           预览
         </button>
+        {!preview && (
+          <VoiceInput onTranscript={handleTranscript} />
+        )}
       </div>
       {preview ? (
         <div
@@ -89,6 +109,7 @@ export function MarkdownEditor({
         />
       ) : (
         <textarea
+          ref={textareaRef}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}

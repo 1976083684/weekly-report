@@ -60,6 +60,46 @@ export const PRESET_MODELS: Record<string, PresetModel> = {
         },
         extraKnownMarketplaces: {},
         skipDangerousModePermissionPrompt: true,
+        usageCheck: {
+          enabled: false,
+          timeout: 10,
+          interval: 5,
+          block: `({
+  request: {
+    url: "https://open.bigmodel.cn/api/biz/tokenAccounts/list/my?pageNum=1&pageSize=50&filterEnabled=false",
+    method: "GET",
+    headers: {
+      "Authorization": "Bearer {{apiKey}}",
+      "User-Agent": "cc-switch/1.0"
+    }
+  },
+  extractor: function(response) {
+    if (response.code !== 200) return { remaining: "", unit: "", error: response.msg || "查询失败" };
+    var rows = response.rows || [];
+    if (rows.length === 0) return { remaining: "无有效资源包", unit: "", error: "暂无启用的资源包，请前往控制台查看现金余额" };
+    var totalTokens = 0;
+    var hasActive = false;
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (r.status !== "EXPIRED") {
+        hasActive = true;
+        totalTokens += Number(r.tokenBalance) || 0;
+      }
+    }
+    if (!hasActive) {
+      // 全部过期时，以 filterEnabled=false 再汇总所有
+      totalTokens = 0;
+      for (var j = 0; j < rows.length; j++) {
+        totalTokens += Number(rows[j].tokenBalance) || 0;
+      }
+      return { remaining: "所有资源包已过期", unit: "tokens", error: "所有" + rows.length + "个资源包均已过期，请充值" };
+    }
+    if (totalTokens >= 1000000) return { remaining: (totalTokens / 1000000).toFixed(1) + "M", unit: "tokens" };
+    if (totalTokens >= 1000) return { remaining: (totalTokens / 1000).toFixed(0) + "K", unit: "tokens" };
+    return { remaining: String(totalTokens), unit: "tokens" };
+  }
+})`,
+        },
       },
       null,
       2

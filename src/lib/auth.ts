@@ -10,9 +10,21 @@ const GiteeProvider = {
   id: "gitee",
   name: "Gitee",
   type: "oauth" as const,
-  authorization: "https://gitee.com/oauth/authorize",
+  authorization: {
+    url: "https://gitee.com/oauth/authorize",
+    params: { scope: "user_info" },
+  },
   token: "https://gitee.com/oauth/token",
-  userinfo: "https://gitee.com/api/v5/user",
+  userinfo: {
+    url: "https://gitee.com/api/v5/user",
+    async request({ tokens, provider }: { tokens: { access_token: string }; provider: { userinfo?: { url?: string } } }) {
+      const url = `${provider.userinfo?.url}?access_token=${tokens.access_token}`;
+      const res = await fetch(url, {
+        headers: { "User-Agent": "authjs" },
+      });
+      return res.json();
+    },
+  },
   clientId: process.env.GITEE_ID,
   clientSecret: process.env.GITEE_SECRET,
   profile(profile: { id: number; login: string; name: string; avatar_url: string; email?: string }) {

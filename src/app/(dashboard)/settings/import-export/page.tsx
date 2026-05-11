@@ -59,7 +59,7 @@ export default function ImportExportPage() {
         <h2 className="font-medium text-sm flex items-center gap-2">
           <Download className="w-4 h-4 text-muted-foreground" /> 数据导出
         </h2>
-        <p className="text-xs text-muted-foreground">将所有日记、周报、标签导出为 JSON 文件</p>
+        <p className="text-xs text-muted-foreground">将所有日记、周报、标签、备份配置、AI模型配置导出为 JSON 文件</p>
         <Button onClick={handleExport} variant="outline" size="sm">
           <Download className="w-3.5 h-3.5 mr-1.5" />
           导出数据
@@ -72,7 +72,7 @@ export default function ImportExportPage() {
           <Upload className="w-4 h-4 text-muted-foreground" /> 数据导入
         </h2>
         <p className="text-xs text-muted-foreground">
-          导入之前导出的 JSON 文件。标签将合并，日记和周报按日期+标题去重，仅影响你的个人数据。
+          导入之前导出的 JSON 文件。标签合并，日记/周报按日期+标题去重，备份配置和模型配置按唯一键更新或新增。
         </p>
         <div className="flex gap-2 items-center">
           <Input
