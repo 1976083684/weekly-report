@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   ChevronRight,
   Cpu,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -102,6 +103,16 @@ export default function SettingsPage() {
           <span className="text-sm font-medium flex items-center gap-2">
             <Cpu className="w-4 h-4 text-muted-foreground" />
             模型配置
+          </span>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </Link>
+        <Link
+          href="/settings/prompts"
+          className="flex items-center justify-between p-4 bg-card rounded-xl border border-border hover:border-primary/30 transition-colors"
+        >
+          <span className="text-sm font-medium flex items-center gap-2">
+            <FileText className="w-4 h-4 text-muted-foreground" />
+            提示词配置
           </span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>

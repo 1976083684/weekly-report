@@ -29,31 +29,6 @@ export async function GET() {
     orderBy: { createdAt: "asc" },
   });
 
-  // 首次访问时自动创建两个预设模型
-  if (models.length === 0) {
-    const created: typeof models = [];
-    for (const [key, preset] of Object.entries(PRESET_MODELS)) {
-      const model = await prisma.aIModel.create({
-        data: {
-          userId: session.user.id,
-          provider: preset.provider,
-          modelName: preset.modelName,
-          apiKey: encrypt(""), // 不预设 API Key，需要用户自行填写
-          baseUrl: preset.baseUrl,
-          website: preset.website,
-          notes: preset.notes,
-          haikuModel: preset.haikuModel,
-          sonnetModel: preset.sonnetModel,
-          opusModel: preset.opusModel,
-          configJson: preset.configJson,
-          isActive: false, // 需要用户配置 Key 后手动启用
-        },
-      });
-      created.push(model);
-    }
-    models = created;
-  }
-
   // 自动修复已有智谱模型的 usageCheck 配置（若无或过时则更新）
   for (const model of models) {
     if (model.provider === "智谱AI" && model.baseUrl === PRESET_MODELS.zhipu.baseUrl) {

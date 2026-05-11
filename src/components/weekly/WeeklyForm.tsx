@@ -40,7 +40,8 @@ export function WeeklyForm() {
   const weekDays = getWeekDates();
   const today = todayStr();
 
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const defaultDay = weekDays.find((d) => d.date === today)?.label || weekDays[0].label;
+  const [selectedDay, setSelectedDay] = useState<string | null>(defaultDay);
   const [diaries, setDiaries] = useState<Map<string, DiaryData>>(new Map());
   interface EntrySummary { title: string; content: string; date: string; type: string; }
   const [allEntries, setAllEntries] = useState<EntrySummary[]>([]);

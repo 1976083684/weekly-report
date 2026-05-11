@@ -330,6 +330,8 @@ export default function ModelDetailPage() {
           headers: req.headers || {},
           extractor: extractorStr.toString(),
           timeout: usageTimeout,
+          baseUrl,
+          apiKey,
         }),
       });
       const data = await res.json();

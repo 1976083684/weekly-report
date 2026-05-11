@@ -13,11 +13,8 @@ import {
   Pencil,
   Copy,
   RefreshCw,
-  Cpu,
-  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PRESET_MODELS } from "@/lib/preset-models";
 
 interface UsageBalance {
   enabled: boolean;
@@ -49,6 +46,7 @@ export default function ModelsPage() {
   const [testResults, setTestResults] = useState<Record<string, { ok: boolean; text: string }>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [refreshingId, setRefreshingId] = useState<string | null>(null);
+
 
   function timeAgo(isoStr: string): string {
     const diff = Date.now() - new Date(isoStr).getTime();
@@ -88,62 +86,16 @@ export default function ModelsPage() {
 
   const refreshBalance = async (id: string) => {
     setRefreshingId(id);
-    const model = models.find((m) => m.id === id);
-    if (!model) { setRefreshingId(null); return; }
-
-    const res = await fetch("/api/settings/models");
-    const data = await res.json();
-    const full = (data.models || []).find((m: ModelData) => m.id === id);
-    let uc: { block?: string; timeout?: number } = {};
     try {
-      if (full?.configJson) {
-        const obj = JSON.parse(full.configJson as unknown as string);
-        uc = obj.usageCheck || {};
-      }
-    } catch { /* ignore */ }
-
-    const DEFAULT_FALLBACK_BLOCK = `({
-  request: {
-    url: "{{baseUrl}}/user/balance",
-    method: "GET",
-    headers: {
-      "Authorization": "Bearer {{apiKey}}",
-      "User-Agent": "cc-switch/1.0"
+      await fetch(`/api/settings/models/${id}/usage-test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ modelId: id, saveResult: true }),
+      });
+      fetchModels();
+    } finally {
+      setRefreshingId(null);
     }
-  },
-  extractor: function(response) {
-    var info = (response.balance_infos && response.balance_infos[0]) || {};
-    return {
-      remaining: info.total_balance || response.total_balance || response.balance || "",
-      unit: info.currency || response.unit || ""
-    };
-  }
-})`;
-
-    const block = uc.block || DEFAULT_FALLBACK_BLOCK;
-    let parsed: { request?: { url?: string; method?: string; headers?: Record<string, string> }; extractor?: unknown } = {};
-    try {
-      const fn = new Function(`"use strict"; return ${block};`);
-      parsed = fn();
-    } catch { /* ignore */ }
-
-    const req = parsed.request || {};
-    const extractorStr = typeof parsed.extractor === "function" ? parsed.extractor.toString() : "";
-
-    await fetch(`/api/settings/models/${id}/usage-test`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        url: req.url || "",
-        method: req.method || "GET",
-        headers: req.headers || {},
-        extractor: extractorStr,
-        timeout: uc.timeout || 10,
-        saveResult: true,
-      }),
-    });
-    fetchModels();
-    setRefreshingId(null);
   };
 
   const testModel = async (id: string) => {
@@ -173,6 +125,7 @@ export default function ModelsPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <Link
@@ -196,32 +149,7 @@ export default function ModelsPage() {
       {loading ? (
         <p className="text-muted-foreground text-sm text-center py-8">加载中...</p>
       ) : models.length === 0 ? (
-        <section className="bg-card rounded-xl border border-border p-4 space-y-3">
-          <h2 className="font-medium text-sm flex items-center gap-2">
-            <Cpu className="w-4 h-4 text-muted-foreground" /> 添加您的第一个模型
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            选择供应商后将自动填充配置信息，只需填写 API Key 即可使用。
-          </p>
-          <div className="grid gap-3">
-            {Object.entries(PRESET_MODELS).map(([key, preset]) => (
-              <Link
-                key={key}
-                href={`/settings/models/new?provider=${key}`}
-                className="flex items-center justify-between p-3 rounded-lg border border-border hover:border-primary/30 transition-colors bg-muted/30"
-              >
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">{preset.provider}</span>
-                    <span className="text-xs text-muted-foreground">{preset.modelName}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{preset.notes}</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              </Link>
-            ))}
-          </div>
-        </section>
+        <p className="text-muted-foreground text-sm text-center py-12">------------- 请添加模型配置 -------------</p>
       ) : (
         <div className="space-y-3">
           {models.map((model) => {
