@@ -2,11 +2,10 @@ import * as crypto from "crypto";
 
 const ALGORITHM = "aes-256-gcm";
 
+const DEFAULT_KEY = "weekly-report-default-encryption-key-v1";
+
 function getKey(): Buffer {
-  const key = process.env.ENCRYPTION_KEY;
-  if (!key || key === "change-me-to-32-byte-encryption-key") {
-    throw new Error("请在 .env 中设置 ENCRYPTION_KEY（32字节密钥）");
-  }
+  const key = process.env.ENCRYPTION_KEY || DEFAULT_KEY;
   return crypto.createHash("sha256").update(key).digest();
 }
 
