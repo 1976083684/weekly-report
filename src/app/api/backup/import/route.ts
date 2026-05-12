@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/crypto";
+import { parseLocalDate } from "@/lib/utils";
 import { parseGitHubUrl } from "@/lib/github";
 import { parseGiteeUrl } from "@/lib/gitee";
 import {
@@ -197,29 +198,39 @@ export async function POST(request: NextRequest) {
           const parsed = parseDiaryMarkdown(md);
           if (!parsed) { skipped++; continue; }
 
-          const date = new Date(parsed.date + "T00:00:00.000Z");
+          const date = parseLocalDate(parsed.date);
           const existing = await prisma.diary.findFirst({
-            where: { userId, date, title: parsed.title },
+            where: { userId, date, type: "diary" },
           });
-          if (existing) { skipped++; continue; }
-
-          await prisma.diary.create({
-            data: { userId, title: parsed.title, content: parsed.content, date, type: "diary", mood: parsed.mood ?? null },
-          });
+          if (existing) {
+            await prisma.diary.update({
+              where: { id: existing.id },
+              data: { title: parsed.title, content: parsed.content, mood: parsed.mood ?? null },
+            });
+          } else {
+            await prisma.diary.create({
+              data: { userId, title: parsed.title, content: parsed.content, date, type: "diary", mood: parsed.mood ?? null },
+            });
+          }
           imported++;
         } else if (file.kind === "daily_report") {
           const parsed = parseDailyReportMarkdown(md);
           if (!parsed) { skipped++; continue; }
 
-          const date = new Date(parsed.date + "T00:00:00.000Z");
+          const date = parseLocalDate(parsed.date);
           const existing = await prisma.diary.findFirst({
-            where: { userId, date, title: parsed.title },
+            where: { userId, date, type: "daily_report" },
           });
-          if (existing) { skipped++; continue; }
-
-          await prisma.diary.create({
-            data: { userId, title: parsed.title, content: parsed.content, date, type: "daily_report" },
-          });
+          if (existing) {
+            await prisma.diary.update({
+              where: { id: existing.id },
+              data: { title: parsed.title, content: parsed.content },
+            });
+          } else {
+            await prisma.diary.create({
+              data: { userId, title: parsed.title, content: parsed.content, date, type: "daily_report" },
+            });
+          }
           imported++;
         } else if (file.kind === "weekly") {
           const dates = parseWeeklyPath(file.path);
@@ -228,21 +239,21 @@ export async function POST(request: NextRequest) {
           const parsed = parseWeeklyMarkdown(md, dates.startDate, dates.endDate);
           if (!parsed) { skipped++; continue; }
 
-          const startDate = new Date(parsed.startDate + "T00:00:00.000Z");
+          const startDate = parseLocalDate(parsed.startDate);
+          const endDate = parseLocalDate(parsed.endDate);
           const existing = await prisma.weekly.findFirst({
-            where: { userId, startDate, title: parsed.title },
+            where: { userId, startDate },
           });
-          if (existing) { skipped++; continue; }
-
-          await prisma.weekly.create({
-            data: {
-              userId,
-              title: parsed.title,
-              content: parsed.content,
-              startDate,
-              endDate: new Date(parsed.endDate + "T00:00:00.000Z"),
-            },
-          });
+          if (existing) {
+            await prisma.weekly.update({
+              where: { id: existing.id },
+              data: { title: parsed.title, content: parsed.content, endDate },
+            });
+          } else {
+            await prisma.weekly.create({
+              data: { userId, title: parsed.title, content: parsed.content, startDate, endDate },
+            });
+          }
           imported++;
         }
       } catch (err) {
