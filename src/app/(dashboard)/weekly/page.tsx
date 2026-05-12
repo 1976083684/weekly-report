@@ -70,8 +70,29 @@ export default function WeeklyPage() {
       })),
     ];
 
-    // Sort by date descending
-    merged.sort((a, b) => b.date.localeCompare(a.date));
+    // Sort: group by week, weekly first in each week, then daily reports Mon-Sun
+    // Most recent week first
+    const getMonday = (dateStr: string) => {
+      // Normalize: dateStr may be full ISO ("2026-05-11T00:00:00.000Z") or date-only ("2026-05-11")
+      const dateOnly = dateStr.slice(0, 10);
+      const d = new Date(dateOnly + "T12:00:00");
+      if (isNaN(d.getTime())) return dateOnly; // fallback for invalid dates
+      const day = d.getDay();
+      const diff = day === 0 ? -6 : 1 - day;
+      d.setDate(d.getDate() + diff);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    };
+
+    merged.sort((a, b) => {
+      const weekA = getMonday(a.date);
+      const weekB = getMonday(b.date);
+      // Recent weeks first
+      if (weekB !== weekA) return weekB.localeCompare(weekA);
+      // Weekly at top of the week, then daily reports newest first
+      if (a.kind !== b.kind) return a.kind === "weekly" ? -1 : 1;
+      // Daily reports: newest first (descending)
+      return b.date.localeCompare(a.date);
+    });
 
     setItems(merged);
     setLoading(false);

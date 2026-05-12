@@ -58,7 +58,7 @@ export function WeeklyForm() {
   const [existingWeeklyId, setExistingWeeklyId] = useState<string | null>(null);
   const [weeklyLoaded, setWeeklyLoaded] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [showWeekly, setShowWeekly] = useState(true);
+  const [showWeekly, setShowWeekly] = useState(false);
 
   // Load all diaries + existing weekly for this week
   useEffect(() => {
@@ -112,7 +112,6 @@ export function WeeklyForm() {
         if (list.length > 0) {
           setExistingWeeklyId(list[0].id);
           setWeeklyContent(list[0].content);
-          setShowWeekly(true);
         }
         setWeeklyLoaded(true);
       })

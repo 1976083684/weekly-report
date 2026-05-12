@@ -25,7 +25,7 @@ export async function GET() {
   return NextResponse.json({ user });
 }
 
-// PUT - 更新个人信息（手机号等）
+// PUT - 更新个人信息（用户名、手机号等）
 export async function PUT(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -34,7 +34,7 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { phone } = body;
+    const { phone, name } = body;
 
     if (phone !== undefined && phone !== null && phone !== "") {
       // 检查手机号是否已被其他用户绑定
@@ -46,11 +46,23 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    const updateData: Record<string, unknown> = {};
+    if (phone !== undefined) {
+      updateData.phone = phone || null;
+    }
+    if (name !== undefined) {
+      if (!name || name.trim().length === 0) {
+        return NextResponse.json({ error: "用户名不能为空" }, { status: 400 });
+      }
+      if (name.trim().length > 50) {
+        return NextResponse.json({ error: "用户名不能超过50个字符" }, { status: 400 });
+      }
+      updateData.name = name.trim();
+    }
+
     const user = await prisma.user.update({
       where: { id: session.user.id },
-      data: {
-        phone: phone || null,
-      },
+      data: updateData,
       select: {
         id: true,
         email: true,

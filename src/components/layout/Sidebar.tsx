@@ -26,8 +26,8 @@ export function Sidebar() {
           <Feather className="w-5 h-5 text-primary" />
         </div>
         <div>
-          <span className="font-[family-name:var(--font-serif)] font-bold text-sm text-foreground">日记周报</span>
-          <p className="text-[10px] text-muted-foreground">记录每一天，回顾每一周</p>
+          <span className="font-[family-name:var(--font-serif)] font-bold text-sm text-foreground">AI随记</span>
+          <p className="text-[10px] text-muted-foreground">AI驱动，智慧记录</p>
         </div>
       </div>
       <nav className="flex-1 py-4 px-3 space-y-1">

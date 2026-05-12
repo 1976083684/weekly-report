@@ -19,6 +19,10 @@ interface UserData {
 
 export default function AccountPage() {
   const [user, setUser] = useState<UserData | null>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [name, setName] = useState("");
+  const [nameMsg, setNameMsg] = useState("");
+  const [nameSaving, setNameSaving] = useState(false);
   const [editingPhone, setEditingPhone] = useState(false);
   const [phone, setPhone] = useState("");
   const [phoneMsg, setPhoneMsg] = useState("");
@@ -29,6 +33,7 @@ export default function AccountPage() {
       .then((r) => r.json())
       .then((data) => {
         setUser(data.user);
+        setName(data.user?.name || "");
         setPhone(data.user?.phone || "");
       });
   };
@@ -39,6 +44,29 @@ export default function AccountPage() {
 
   const isOAuthBound = (provider: string) =>
     user?.accounts?.some((a) => a.provider === provider);
+
+  const saveName = async () => {
+    setNameMsg("");
+    setNameSaving(true);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name || "" }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUser(data.user);
+        setEditingName(false);
+        setNameMsg("用户名已更新");
+      } else {
+        setNameMsg(data.error || "更新失败");
+      }
+    } catch {
+      setNameMsg("网络错误，请稍后重试");
+    }
+    setNameSaving(false);
+  };
 
   const savePhone = async () => {
     setPhoneMsg("");
@@ -82,7 +110,45 @@ export default function AccountPage() {
               <span className="text-muted-foreground">邮箱</span>
               <span className="text-foreground">{user.email}</span>
               <span className="text-muted-foreground">昵称</span>
-              <span className="text-foreground">{user.name}</span>
+              {editingName ? (
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="输入用户名"
+                    className="h-7 text-sm w-36"
+                  />
+                  <button
+                    type="button"
+                    onClick={saveName}
+                    disabled={nameSaving}
+                    className="inline-flex items-center justify-center h-7 w-7 rounded text-success hover:bg-success/10"
+                    title="保存"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setEditingName(false); setName(user.name || ""); setNameMsg(""); }}
+                    className="inline-flex items-center justify-center h-7 w-7 rounded text-muted-foreground hover:text-foreground"
+                    title="取消"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-foreground">{user.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => { setEditingName(true); setNameMsg(""); }}
+                    className="inline-flex items-center justify-center h-6 w-6 rounded text-muted-foreground hover:text-foreground transition-colors"
+                    title="修改用户名"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
               <span className="text-muted-foreground">手机号</span>
               {editingPhone ? (
                 <div className="flex items-center gap-1.5">
@@ -125,6 +191,11 @@ export default function AccountPage() {
                 </div>
               )}
             </div>
+            {nameMsg && (
+              <p className={`text-xs ${nameMsg.includes("失败") || nameMsg.includes("错误") ? "text-danger" : "text-success"}`}>
+                {nameMsg}
+              </p>
+            )}
             {phoneMsg && (
               <p className={`text-xs ${phoneMsg.includes("失败") || phoneMsg.includes("错误") || phoneMsg.includes("已被") ? "text-danger" : "text-success"}`}>
                 {phoneMsg}

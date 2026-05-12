@@ -1,19 +1,22 @@
-# 日记周报
+# AI随记
 
-个人日记与周报管理系统 —— 记录每一天，回顾每一周。
+AI驱动的个人日记与周报管理系统 —— 智慧记录每一天。
 
-支持 Markdown 编辑、标签分类、Gitee 风格活跃度热力图、自动周报生成，数据可备份至 GitHub / Gitee。
+支持 Markdown 编辑、AI 内容优化、语音输入、标签分类、活跃度热力图、自动周报生成，数据可备份至 GitHub / Gitee 并支持逆向导入。
 
 ## 功能特性
 
-- **日记管理** — 支持 Markdown 编辑、心情选择、标签分类、置顶
-- **周报生成** — 选择一周的日记自动生成周报总结
+- **AI 优化** — 调用 AI 模型优化日记/周报内容，支持多模型配置与切换
+- **日记管理** — Markdown 编辑、心情选择、标签分类、置顶
+- **周报生成** — 一周日报自动聚合生成周报总结，支持手动编辑
 - **仪表盘** — Gitee 风格年度活跃度热力图、本周活跃度柱状图、最近动态
-- **标签系统** — 自定义标签，按标签筛选日记
-- **日历视图** — 月度日历，按日期查看日记
-- **备份同步** — 支持 GitHub / Gitee 仓库备份与恢复
-- **数据导出** — 导出 Markdown / JSON 格式
-- **认证系统** — 支持邮箱注册登录、GitHub / Gitee OAuth 第三方登录
+- **标签系统** — 自定义标签，多选筛选，批量删除
+- **语音输入** — 支持 Chrome/Edge Web Speech API 实时语音转文字录入
+- **备份同步** — 数据推送至 GitHub / Gitee 仓库，支持按周/月/全部范围
+- **逆向导入** — 从 GitHub / Gitee 备份仓库拉取 Markdown 文件解析导入
+- **数据导出** — 导出/导入 JSON 格式（含日记、周报、标签、配置）
+- **认证系统** — 手机号/邮箱注册登录、GitHub / Gitee OAuth 第三方登录
+- **用户设置** — 修改用户名、手机号、密码；账号删除
 - **响应式** — 适配桌面浏览器与移动端
 
 ## 技术栈
@@ -70,14 +73,17 @@
 │   │   └── ui/                 # shadcn/ui 基础组件
 │   ├── lib/
 │   │   ├── auth.ts             # Auth.js 配置
+│   │   ├── auth.config.ts      # Auth Edge 兼容配置
 │   │   ├── prisma.ts           # Prisma 客户端
 │   │   ├── diary.ts            # 日记数据层
 │   │   ├── weekly.ts           # 周报数据层
 │   │   ├── backup.ts           # 备份逻辑
 │   │   ├── github.ts           # GitHub API 封装
 │   │   ├── gitee.ts            # Gitee API 封装
-│   │   ├── crypto.ts           # 加密工具
-│   │   └── utils.ts            # 通用工具
+│   │   ├── crypto.ts           # 加密工具（AES-256-GCM）
+│   │   ├── import-parser.ts    # 备份文件 Markdown 解析器
+│   │   ├── preset-models.ts    # AI 预设模型定义
+│   │   └── utils.ts            # 通用工具（本地时区日期）
 │   └── middleware.ts            # 路由鉴权
 ├── .env                        # 环境变量
 ├── package.json
@@ -89,10 +95,12 @@
 
 ```
 User ──┬── Diary ──┬── DiaryTag ── Tag
-       │           └── (mood, pinned, date)
+       │           └── (mood, pinned, date, type)
        ├── Weekly (startDate, endDate)
        ├── BackupConfig (provider, repoUrl, token)
-       └── BackupLog (status, commitSha)
+       ├── BackupLog (status, commitSha)
+       ├── AIModel (provider, modelName, apiKey, baseUrl, isActive)
+       └── PromptTemplate (type, systemPrompt)
 ```
 
 ## 快速开始
@@ -234,10 +242,18 @@ pm2 start weekly-report
 | POST | `/api/weekly/generate` | 自动生成周报 |
 | GET/POST | `/api/tags` | 标签列表 / 新建 |
 | GET/PUT/DELETE | `/api/tags/[id]` | 标签更新 / 删除 |
-| GET | `/api/settings/export` | 导出数据 |
+| POST | `/api/ai/optimize` | AI 优化内容 |
+| GET | `/api/settings` | 用户信息 |
+| PUT | `/api/settings` | 更新用户名 / 手机号 |
+| GET | `/api/settings/export` | 导出 JSON 数据 |
+| POST | `/api/settings/import` | 导入 JSON 数据 |
 | PUT | `/api/settings/password` | 修改密码 |
+| GET/POST | `/api/settings/models` | AI 模型配置列表 / 新增 |
+| PUT/DELETE | `/api/settings/models/[id]` | AI 模型更新 / 删除 |
+| POST | `/api/settings/models/[id]/test` | AI 模型连接测试 |
 | GET/POST | `/api/backup/config` | 备份配置 |
 | POST | `/api/backup/execute` | 执行备份 |
+| POST | `/api/backup/import` | 逆向导入（GitHub / Gitee） |
 | GET | `/api/backup/logs` | 备份日志 |
 
 ## License

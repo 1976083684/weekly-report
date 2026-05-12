@@ -1,16 +1,120 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Download, Upload, Loader2 } from "lucide-react";
+import { ArrowLeft, Download, Upload, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+interface GitConfig {
+  id: string;
+  provider: string;
+  repoUrl: string;
+  branch: string;
+  path: string;
+}
+
+function GitImportSection({
+  provider,
+  label,
+  config,
+  loading,
+}: {
+  provider: string;
+  label: string;
+  config: GitConfig | null;
+  loading: boolean;
+}) {
+  const [importing, setImporting] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const handleImport = async () => {
+    if (!config) return;
+    setImporting(true);
+    setMsg("");
+    try {
+      const res = await fetch("/api/backup/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ configId: config.id, scope: "all" }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMsg(data.details || data.message);
+      } else {
+        setMsg(`导入失败：${data.error}`);
+      }
+    } catch {
+      setMsg("网络错误，请稍后重试");
+    }
+    setImporting(false);
+  };
+
+  return (
+    <section className="bg-card rounded-xl border border-border p-4 space-y-3">
+      <h2 className="font-medium text-sm flex items-center gap-2">
+        <RefreshCw className="w-4 h-4 text-muted-foreground" /> 从 {label} 导入
+      </h2>
+      <p className="text-xs text-muted-foreground">
+        从已配置的 {label} 备份仓库中拉取备份文件并导入到本地。需先在"备份设置"中配置 {label} 备份。
+      </p>
+      {loading ? (
+        <p className="text-xs text-muted-foreground">加载配置中...</p>
+      ) : !config ? (
+        <p className="text-xs text-amber-500">
+          未检测到 {label} 备份配置，请先在
+          <Link href="/settings/backup" className="underline mx-0.5">备份设置</Link>
+          中配置。
+        </p>
+      ) : (
+        <>
+          <div className="text-xs text-muted-foreground space-y-0.5">
+            <p>仓库：{config.repoUrl}</p>
+            <p>分支：{config.branch}　路径：{config.path}</p>
+          </div>
+          <Button
+            onClick={handleImport}
+            disabled={importing}
+            variant="outline"
+            size="sm"
+          >
+            {importing ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+            ) : (
+              <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+            )}
+            从 {label} 拉取导入
+          </Button>
+          {msg && (
+            <p className={`text-xs ${msg.includes("失败") || msg.includes("错误") ? "text-danger" : "text-success"}`}>
+              {msg}
+            </p>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 export default function ImportExportPage() {
-  // Import
+  // JSON Import/Export
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState("");
+
+  // Git reverse import
+  const [gitConfigs, setGitConfigs] = useState<GitConfig[]>([]);
+  const [gitLoading, setGitLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/backup/config")
+      .then((r) => r.json())
+      .then((data) => {
+        setGitConfigs(data.configs || []);
+        setGitLoading(false);
+      })
+      .catch(() => setGitLoading(false));
+  }, []);
 
   const handleExport = () => {
     window.open("/api/settings/export", "_blank");
@@ -45,6 +149,9 @@ export default function ImportExportPage() {
     setImporting(false);
   };
 
+  const githubConfig = gitConfigs.find((c) => c.provider === "github") || null;
+  const giteeConfig = gitConfigs.find((c) => c.provider === "gitee") || null;
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <Link href="/settings" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -66,7 +173,7 @@ export default function ImportExportPage() {
         </Button>
       </section>
 
-      {/* Import */}
+      {/* JSON Import */}
       <section className="bg-card rounded-xl border border-border p-4 space-y-3">
         <h2 className="font-medium text-sm flex items-center gap-2">
           <Upload className="w-4 h-4 text-muted-foreground" /> 数据导入
@@ -93,6 +200,22 @@ export default function ImportExportPage() {
           </p>
         )}
       </section>
+
+      {/* GitHub Reverse Import */}
+      <GitImportSection
+        provider="github"
+        label="GitHub"
+        config={githubConfig}
+        loading={gitLoading}
+      />
+
+      {/* Gitee Reverse Import */}
+      <GitImportSection
+        provider="gitee"
+        label="Gitee"
+        config={giteeConfig}
+        loading={gitLoading}
+      />
     </div>
   );
 }

@@ -66,9 +66,9 @@ function LoginForm() {
           <Feather className="w-8 h-8 text-primary" />
         </div>
         <h1 className="font-[family-name:var(--font-serif)] text-3xl font-bold tracking-tight text-foreground">
-          日记周报
+          AI随记
         </h1>
-        <p className="text-muted-foreground text-sm mt-2">记录每一天，回顾每一周</p>
+        <p className="text-muted-foreground text-sm mt-2">AI驱动，智慧记录每一天</p>
       </div>
 
       {/* 卡片 */}

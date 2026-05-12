@@ -20,8 +20,8 @@ const notoSerif = Noto_Serif_SC({
 });
 
 export const metadata: Metadata = {
-  title: "日记周报",
-  description: "个人日记与周报管理系统",
+  title: "AI随记",
+  description: "AI驱动的个人日记与周报管理系统",
 };
 
 export default function RootLayout({
