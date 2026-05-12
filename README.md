@@ -12,7 +12,7 @@ AI驱动的个人日记与周报管理系统 —— 智慧记录每一天。
 - **仪表盘** — Gitee 风格年度活跃度热力图、本周活跃度柱状图、最近动态
 - **标签系统** — 自定义标签，多选筛选，批量删除
 - **语音输入** — 支持 Chrome/Edge Web Speech API 实时语音转文字录入
-- **备份同步** — 数据推送至 GitHub / Gitee 仓库，支持按周/月/全部范围
+- **备份同步** — 推送至 GitHub / Gitee 仓库，支持按周/月/全部范围；支持定时自动备份
 - **逆向导入** — 从 GitHub / Gitee 备份仓库拉取 Markdown 文件解析导入
 - **数据导出** — 导出/导入 JSON 格式（含日记、周报、标签、配置）
 - **认证系统** — 手机号/邮箱注册登录、GitHub / Gitee OAuth 第三方登录
@@ -254,6 +254,7 @@ pm2 start weekly-report
 | GET/POST | `/api/backup/config` | 备份配置 |
 | POST | `/api/backup/execute` | 执行备份 |
 | POST | `/api/backup/import` | 逆向导入（GitHub / Gitee） |
+| GET | `/api/backup/schedule/check` | 定时备份检查 |
 | GET | `/api/backup/logs` | 备份日志 |
 
 ## License

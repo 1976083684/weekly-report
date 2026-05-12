@@ -116,15 +116,19 @@ model Weekly {
 }
 
 model BackupConfig {
-  id       String      @id @default(cuid())
-  userId   String
-  provider String
-  repoUrl  String
-  branch   String      @default("main")
-  path     String      @default("diary/")
-  token    String
-  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  logs     BackupLog[]
+  id              String      @id @default(cuid())
+  userId          String
+  provider        String
+  repoUrl         String
+  branch          String      @default("main")
+  path            String      @default("diary/")
+  token           String
+  scheduleEnabled Boolean     @default(false)
+  scheduleScope   String      @default("week")
+  scheduleTime    DateTime?
+  scheduleLastRun DateTime?
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs            BackupLog[]
 
   @@unique([userId, provider])
 }

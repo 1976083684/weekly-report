@@ -10,6 +10,9 @@ const configSchema = z.object({
   branch: z.string().min(1).default("main"),
   path: z.string().min(1).default("diary/"),
   token: z.string().optional(),
+  scheduleEnabled: z.boolean().optional(),
+  scheduleScope: z.enum(["week", "month", "all"]).optional(),
+  scheduleTime: z.string().nullable().optional(),
 });
 
 export async function GET() {
@@ -20,7 +23,7 @@ export async function GET() {
 
   const configs = await prisma.backupConfig.findMany({
     where: { userId: session.user.id },
-    select: { id: true, provider: true, repoUrl: true, branch: true, path: true, token: true },
+    select: { id: true, provider: true, repoUrl: true, branch: true, path: true, token: true, scheduleEnabled: true, scheduleScope: true, scheduleTime: true, scheduleLastRun: true },
   });
 
   const result = configs.map((c) => ({
@@ -30,6 +33,10 @@ export async function GET() {
     branch: c.branch,
     path: c.path,
     hasToken: !!c.token,
+    scheduleEnabled: c.scheduleEnabled,
+    scheduleScope: c.scheduleScope,
+    scheduleTime: c.scheduleTime?.toISOString() ?? null,
+    scheduleLastRun: c.scheduleLastRun?.toISOString() ?? null,
   }));
 
   return NextResponse.json({ configs: result });
@@ -61,6 +68,13 @@ export async function PUT(request: NextRequest) {
     }
 
     let configId: string;
+    const scheduleData: Record<string, unknown> = {};
+    if (data.scheduleEnabled !== undefined) scheduleData.scheduleEnabled = data.scheduleEnabled;
+    if (data.scheduleScope !== undefined) scheduleData.scheduleScope = data.scheduleScope;
+    if (data.scheduleTime !== undefined) {
+      scheduleData.scheduleTime = data.scheduleTime ? new Date(data.scheduleTime) : null;
+    }
+
     if (existing) {
       await prisma.backupConfig.update({
         where: { id: existing.id },
@@ -69,6 +83,7 @@ export async function PUT(request: NextRequest) {
           branch: data.branch,
           path: data.path,
           token: encryptedToken,
+          ...scheduleData,
         },
       });
       configId = existing.id;
@@ -81,6 +96,7 @@ export async function PUT(request: NextRequest) {
           branch: data.branch,
           path: data.path,
           token: encryptedToken,
+          ...scheduleData,
         },
       });
       configId = created.id;

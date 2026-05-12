@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { ArrowLeft, Globe } from "lucide-react";
 import { BackupConfigForm } from "@/components/backup/BackupConfigForm";
@@ -12,10 +12,15 @@ interface BackupConfig {
   branch: string;
   path: string;
   hasToken?: boolean;
+  scheduleEnabled?: boolean;
+  scheduleScope?: string;
+  scheduleTime?: string | null;
+  scheduleLastRun?: string | null;
 }
 
 export default function BackupPage() {
   const [configs, setConfigs] = useState<BackupConfig[]>([]);
+  const scheduleTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchData = async () => {
     const res = await fetch("/api/backup/config");
@@ -25,7 +30,25 @@ export default function BackupPage() {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  // Schedule check — poll every 60 seconds when page is open
+  const checkSchedule = async () => {
+    try {
+      await fetch("/api/backup/schedule/check");
+    } catch {
+      // silent
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+    // Check schedule immediately on mount
+    checkSchedule();
+    // Then poll every 60 seconds
+    scheduleTimerRef.current = setInterval(checkSchedule, 60_000);
+    return () => {
+      if (scheduleTimerRef.current) clearInterval(scheduleTimerRef.current);
+    };
+  }, []);
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
