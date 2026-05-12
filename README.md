@@ -209,6 +209,7 @@ cd /srv/weekly-report
 git pull
 npm install
 npx prisma generate
+npx prisma db push    # Schema 变更时同步到数据库
 npm run build
 pm2 restart weekly-report
 ```
