@@ -103,6 +103,42 @@ User ──┬── Diary ──┬── DiaryTag ── Tag
        └── PromptTemplate (type, systemPrompt)
 ```
 
+## UI原型图
+
+1.首页
+
+![image-20260512194342416](images/README_images/image-20260512194342416.png)
+
+2.登录界面
+
+![image-20260512181426305](images/README_images/image-20260512181426305.png)
+
+3.日报/周报
+
+![image-20260512181520162](images/README_images/image-20260512181520162.png)
+
+4.设置界面
+
+![image-20260512181756066](images/README_images/image-20260512181756066.png)
+
+5.支持开源网站备份
+
+![image-20260512181601231](images/README_images/image-20260512181601231.png)
+
+![image-20260512181645602](images/README_images/image-20260512181645602.png)
+
+6.支持配置AI大模型
+
+![image-20260512181707217](images/README_images/image-20260512181707217.png)
+
+6.支持自定义配置提示词
+
+![image-20260512181828951](images/README_images/image-20260512181828951.png)
+
+7.导入导出
+
+![image-20260512181842077](images/README_images/image-20260512181842077.png)
+
 ## 快速开始
 
 ### 环境要求

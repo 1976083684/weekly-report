@@ -128,38 +128,53 @@ export default function DashboardPage() {
     const firstDay = new Date(heatmapStart);
     firstDay.setDate(firstDay.getDate() - firstDay.getDay());
 
+    const weekMonths: number[] = []; // 每周归属的月份
     const weeks: { date: Date; count: number }[][] = [];
-    const monthLabels: { label: string; weekIndex: number }[] = [];
     let currentDate = new Date(firstDay);
-    let weekIndex = 0;
-    let lastMonth = -1;
 
     while (currentDate <= heatmapEnd || weeks.length === 0) {
       const week: { date: Date; count: number }[] = [];
+      const monthTally = new Map<number, number>(); // 本周各月份天数统计
       for (let d = 0; d < 7; d++) {
         const m = currentDate.getMonth();
-        if (d === 0 && m !== lastMonth) {
-          monthLabels.push({ label: `${m + 1}月`, weekIndex });
-          lastMonth = m;
-        }
+        monthTally.set(m, (monthTally.get(m) || 0) + 1);
         week.push({
           date: new Date(currentDate),
           count: activityMap.get(toLocalDateStr(currentDate)) || 0,
         });
         currentDate.setDate(currentDate.getDate() + 1);
       }
+      // 取天数最多的月份作为本周归属
+      let bestMonth = 0;
+      let bestCount = 0;
+      for (const [m, c] of monthTally) {
+        if (c > bestCount) { bestCount = c; bestMonth = m; }
+      }
+      weekMonths.push(bestMonth);
       weeks.push(week);
-      weekIndex++;
-      // 如果已经过了结束日期，且完成了本周，结束
       if (currentDate > heatmapEnd && currentDate.getDay() === 0) break;
-      // 安全限制
       if (weeks.length > 60) break;
+    }
+
+    // 只有月份变化时才生成标签
+    const monthLabels: { label: string; weekIndex: number }[] = [];
+    for (let i = 0; i < weekMonths.length; i++) {
+      if (i === 0 || weekMonths[i] !== weekMonths[i - 1]) {
+        monthLabels.push({ label: `${weekMonths[i] + 1}月`, weekIndex: i });
+      }
     }
 
     return { weeks, monthLabels };
   };
 
   const { weeks, monthLabels } = buildHeatmap();
+
+  // 构建月份跨度：每个月份标签占据的实际周数
+  const monthSpans = monthLabels.map((ml, i) => {
+    const nextWeek = i + 1 < monthLabels.length ? monthLabels[i + 1].weekIndex : weeks.length;
+    return { label: ml.label, spanWeeks: nextWeek - ml.weekIndex };
+  });
+
   const dayLabels = ["日", "一", "二", "三", "四", "五", "六"];
 
   // 本周数据
@@ -181,7 +196,7 @@ export default function DashboardPage() {
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
               <FileText className="w-4 h-4 text-primary" />
             </div>
-            <span className="text-xs text-muted-foreground">总日记数</span>
+            <span className="text-xs text-muted-foreground">总记录数</span>
           </div>
           <p className="text-2xl font-bold font-[family-name:var(--font-serif)] text-foreground">
             {stats.totalDiaries}
@@ -222,9 +237,10 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-5">
-        {/* 左侧 - 热力图 + 周活跃度 */}
-        <div className="lg:col-span-2 space-y-5">
+      {/* 下方 — 左右两栏自适应 */}
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-5">
+        {/* 左侧 — 活跃度 + 本周活跃度 + 最近动态 */}
+        <div className="space-y-5">
           {/* 年度活跃度热力图（Gitee 风格） */}
           <div className="bg-card rounded-xl border border-border p-5">
             <div className="flex items-center justify-between mb-4">
@@ -262,63 +278,64 @@ export default function DashboardPage() {
             {/* 热力图 — 百分比自适应，支持横向滑动 */}
             <div className="overflow-x-auto -mx-1 touch-pan-x scroll-smooth">
               <div className="w-full min-w-[600px]">
-                {/* 月份标签行 */}
-                <div className="flex pl-5 mb-0.5">
-                  {weeks.map((week, wi) => {
-                    const ml = monthLabels.find((m) => m.weekIndex === wi);
-                    return (
-                      <div
-                        key={wi}
-                        className="text-[8px] sm:text-[10px] text-muted-foreground leading-tight overflow-hidden"
-                        style={{ width: `${100 / weeks.length}%`, flexShrink: 0 }}
-                      >
-                        {ml?.label || ""}
-                      </div>
-                    );
-                  })}
+                {/* 月份标签行 — 与下方格子列严格对齐 */}
+                <div
+                  className="grid mb-0.5 gap-x-[2px] sm:gap-x-[3px]"
+                  style={{ gridTemplateColumns: `1.25rem repeat(${weeks.length}, 1fr)` }}
+                >
+                  <div />
+                  {monthSpans.map((ms, i) => (
+                    <div
+                      key={i}
+                      className="text-[8px] sm:text-[10px] text-muted-foreground leading-tight text-center"
+                      style={{ gridColumn: `span ${ms.spanWeeks}` }}
+                    >
+                      {ms.label}
+                    </div>
+                  ))}
                 </div>
 
                 {/* 按行渲染：每天一行，每行包含所有周的那一天 */}
                 {dayLabels.map((dayLabel, di) => (
-                  <div key={di} className="flex items-center mb-[2px] sm:mb-[3px]">
+                  <div
+                    key={di}
+                    className="grid items-center mb-[2px] sm:mb-[3px] gap-x-[2px] sm:gap-x-[3px]"
+                    style={{ gridTemplateColumns: `1.25rem repeat(${weeks.length}, 1fr)` }}
+                  >
                     {/* 星期标签 */}
-                    <div className="w-5 shrink-0 text-[8px] sm:text-[10px] text-muted-foreground text-right pr-1">
+                    <div className="text-[8px] sm:text-[10px] text-muted-foreground text-right pr-1">
                       {di % 2 === 0 ? dayLabel : ""}
                     </div>
                     {/* 当天所有周的格子 */}
-                    <div className="flex flex-1 gap-[2px] sm:gap-[3px]">
-                      {weeks.map((week, wi) => {
-                        const day = week[di];
-                        const inRange = day.date >= heatmapStart && day.date <= heatmapEnd;
-                        const dateStr = toLocalDateStr(day.date);
-                        const isFuture = dateStr > toLocalDateStr(new Date());
-                        return (
-                          <div
-                            key={wi}
-                            className={`rounded-[1px] sm:rounded-sm ${
-                              inRange && !isFuture
-                                ? getHeatColor(day.count)
-                                : "bg-transparent"
-                            } ${inRange && !isFuture ? "cursor-pointer" : ""}`}
-                            style={{
-                              width: `${100 / weeks.length}%`,
-                              paddingBottom: `${100 / weeks.length}%`,
-                              flexShrink: 0,
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!inRange || isFuture) return;
-                              const rect = e.currentTarget.getBoundingClientRect();
-                              setTooltip({
-                                text: `${day.count}篇贡献度：${dateStr}`,
-                                x: rect.left + rect.width / 2,
-                                y: rect.top - 8,
-                              });
-                            }}
-                            onMouseLeave={() => setTooltip(null)}
-                          />
-                        );
-                      })}
-                    </div>
+                    {weeks.map((week, wi) => {
+                      const day = week[di];
+                      const inRange = day.date >= heatmapStart && day.date <= heatmapEnd;
+                      const dateStr = toLocalDateStr(day.date);
+                      const isFuture = dateStr > toLocalDateStr(new Date());
+                      return (
+                        <div
+                          key={wi}
+                          className={`rounded-[1px] sm:rounded-sm ${
+                            inRange && !isFuture
+                              ? getHeatColor(day.count)
+                              : "bg-transparent"
+                          } ${inRange && !isFuture ? "cursor-pointer" : ""}`}
+                          style={{
+                            paddingBottom: "100%",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!inRange || isFuture) return;
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setTooltip({
+                              text: `${day.count}篇贡献度：${dateStr}`,
+                              x: rect.left + rect.width / 2,
+                              y: rect.top - 8,
+                            });
+                          }}
+                          onMouseLeave={() => setTooltip(null)}
+                        />
+                      );
+                    })}
                   </div>
                 ))}
 
@@ -495,12 +512,13 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-        </div>
 
-        {/* 右侧面板 */}
-        <div className="space-y-5">
-          {/* 快速记录 */}
-          <div className="bg-card rounded-xl border border-border p-5">
+            </div>
+
+            {/* 右侧 — 快速记录 + 本周总结 + 活跃度说明 */}
+            <div className="space-y-5">
+              {/* 快速记录 */}
+              <div className="bg-card rounded-xl border border-border p-5">
             <h3 className="font-[family-name:var(--font-serif)] font-bold text-base mb-3 flex items-center gap-2">
               <Plus className="w-4 h-4 text-primary" />
               快速记录
@@ -594,9 +612,9 @@ export default function DashboardPage() {
               </p>
             </div>
           </div>
-        </div>
+            </div>
       </div>
 
-    </div>
+  </div>
   );
 }
