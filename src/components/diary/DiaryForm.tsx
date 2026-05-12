@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MarkdownEditor } from "@/components/editor/MarkdownEditor";
@@ -10,6 +10,7 @@ import { MoodSelector } from "@/components/editor/MoodSelector";
 import { TagInput } from "@/components/editor/TagInput";
 import { AiOptimizeButton } from "@/components/ai/AiOptimizeButton";
 import { AlertDialog } from "@/components/ui/alert-dialog";
+import { AppendDialog } from "@/components/editor/AppendDialog";
 import { toast } from "@/components/ui/toast";
 import { todayStr, parseLocalDate } from "@/lib/utils";
 
@@ -51,6 +52,7 @@ export function DiaryForm({ initialData }: DiaryFormProps) {
   const [loading, setLoading] = useState(false);
   const [loadingDiary, setLoadingDiary] = useState(false);
   const [existingDiaryId, setExistingDiaryId] = useState<string | null>(initialData?.id || null);
+  const [appendOpen, setAppendOpen] = useState(false);
   const [alert, setAlert] = useState<{
     open: boolean;
     type: "success" | "error";
@@ -156,6 +158,17 @@ export function DiaryForm({ initialData }: DiaryFormProps) {
         <h1 className="text-xl font-semibold text-foreground flex-1">
           {initialData ? "编辑日记" : "写日记"}
         </h1>
+        {(initialData || existingDiaryId) && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setAppendOpen(true)}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            追加
+          </Button>
+        )}
         <Button type="submit" disabled={loading || loadingDiary}>
           <Save className="w-4 h-4 mr-2" />
           {loading ? "保存中..." : existingDiaryId ? "覆盖保存" : "保存"}
@@ -172,6 +185,15 @@ export function DiaryForm({ initialData }: DiaryFormProps) {
         message={alert.message}
         onConfirm={alert.onConfirm}
       />
+
+      {(initialData || existingDiaryId) && (
+        <AppendDialog
+          open={appendOpen}
+          onOpenChange={setAppendOpen}
+          onAppend={(newText) => setContent((prev) => prev + "\n\n" + newText)}
+          type="diary"
+        />
+      )}
 
       <Input
         value={title}
