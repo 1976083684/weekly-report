@@ -3,17 +3,11 @@
 ![AI随记](images/README_images/AI随记.png)
 
 [![Next.js](https://img.shields.io/badge/Next.js-16%20(Turbopack)-000000?style=flat&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
-
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat&logo=react&logoColor=white)](https://reactjs.org/)
-
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.2-3178C6?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-
 [![SQLite](https://img.shields.io/badge/SQLite-3.41-003B57?style=flat&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
-
 [![Prisma](https://img.shields.io/badge/Prisma-5.4-0C344B?style=flat&logo=prisma&logoColor=white)](https://www.prisma.io/)
-
 [![Auth.js](https://img.shields.io/badge/Auth.js-v5-7C3AED?style=flat&logoColor=white)](https://authjs.dev/)
-
 [![License](https://img.shields.io/badge/License-MIT-000000?style=flat&logo=github&logoColor=white)](https://github.com/1976083684/weekly-report)
 
 
