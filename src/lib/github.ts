@@ -15,8 +15,9 @@ export async function pushToGitHub(options: PushOptions) {
   const normalized = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const contentBase64 = Buffer.from(normalized, "utf-8").toString("base64");
 
-  // Get current file SHA (if exists)
+  // Get current file SHA and content (if exists)
   let sha: string | undefined;
+  let remoteBase64: string | undefined;
   try {
     const getRes = await fetch(`${baseUrl}/contents/${path}?ref=${branch}`, {
       headers: {
@@ -27,9 +28,15 @@ export async function pushToGitHub(options: PushOptions) {
     if (getRes.ok) {
       const data = await getRes.json();
       sha = data.sha;
+      remoteBase64 = data.content?.replace(/\s/g, "");
     }
   } catch {
     // File doesn't exist, will be created
+  }
+
+  // 内容未变化时跳过推送，避免产生重复 commit
+  if (sha && remoteBase64 === contentBase64) {
+    return { sha, skipped: true };
   }
 
   // Create or update file

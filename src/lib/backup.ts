@@ -107,6 +107,7 @@ export async function backupToGit(backupConfigId: string, userId: string, scope 
   ]);
 
   const results: string[] = [];
+  const skipped: string[] = [];
   const errors: string[] = [];
 
   for (const diary of diaries) {
@@ -127,7 +128,11 @@ export async function backupToGit(backupConfigId: string, userId: string, scope 
         message: msg,
       });
 
-      results.push(`${filePath} -> ${result.sha}`);
+      if (result.skipped) {
+        skipped.push(filePath);
+      } else {
+        results.push(`${filePath} -> ${result.sha}`);
+      }
     } catch (err) {
       const date = toLocalDateStr(diary.date);
       errors.push(`日记 ${date} 备份失败: ${(err as Error).message}`);
@@ -152,7 +157,11 @@ export async function backupToGit(backupConfigId: string, userId: string, scope 
         message: msg,
       });
 
-      results.push(`${filePath} -> ${result.sha}`);
+      if (result.skipped) {
+        skipped.push(filePath);
+      } else {
+        results.push(`${filePath} -> ${result.sha}`);
+      }
     } catch (err) {
       const date = toLocalDateStr(report.date);
       errors.push(`日报 ${date} 备份失败: ${(err as Error).message}`);
@@ -179,17 +188,25 @@ export async function backupToGit(backupConfigId: string, userId: string, scope 
         message: msg,
       });
 
-      results.push(`${filePath} -> ${result.sha}`);
+      if (result.skipped) {
+        skipped.push(filePath);
+      } else {
+        results.push(`${filePath} -> ${result.sha}`);
+      }
     } catch (err) {
       errors.push(`周报 ${weekly.title} 备份失败: ${(err as Error).message}`);
     }
   }
 
   const status = errors.length === 0 ? "success" : "failed";
+  const parts: string[] = [];
+  if (results.length > 0) parts.push(`${results.length} 个已更新`);
+  if (skipped.length > 0) parts.push(`${skipped.length} 个无变化跳过`);
+  if (errors.length > 0) parts.push(`${errors.length} 个失败`);
   const message =
     errors.length === 0
-      ? `成功备份 ${results.length} 个文件`
-      : `${results.length} 个成功，${errors.length} 个失败：${errors.join("; ")}`;
+      ? `备份完成：${parts.join("，")}`
+      : `备份完成：${parts.join("，")}（${errors.join("; ")}）`;
 
-  return { status, message, results, errors };
+  return { status, message, results, skipped, errors };
 }

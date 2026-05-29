@@ -51,6 +51,11 @@ export async function PUT(request: NextRequest) {
       data: { passwordHash },
     });
 
+    // 删除该用户所有 session，强制重新登录
+    await prisma.session.deleteMany({
+      where: { userId: session.user.id },
+    });
+
     return NextResponse.json({ success: true });
   } catch (err) {
     if (err instanceof z.ZodError) {

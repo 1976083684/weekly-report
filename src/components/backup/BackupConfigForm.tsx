@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Save, Download, Loader2, CheckCircle2, XCircle, Link2, CloudUpload, Eye, EyeOff, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,67 +14,48 @@ interface BackupConfigFormProps {
     branch: string;
     path: string;
     hasToken?: boolean;
-    scheduleEnabled?: boolean;
     scheduleScope?: string;
     scheduleTime?: string | null;
-    scheduleLastRun?: string | null;
   } | null;
+  scheduleEnabled: boolean;
   onSuccess: () => void;
 }
 
-/** Compute next Sunday 23:00 local time as YYYY-MM-DDTHH:mm string */
-function getNextSunday23(): string {
-  const now = new Date();
-  const day = now.getDay();
-  const diff = day === 0 ? 7 : 7 - day;
-  const sunday = new Date(now);
-  sunday.setDate(now.getDate() + diff);
-  sunday.setHours(23, 0, 0, 0);
-  return toDatetimeLocal(sunday);
-}
-
-function toDatetimeLocal(d: Date): string {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const date = String(d.getDate()).padStart(2, "0");
-  const hours = String(d.getHours()).padStart(2, "0");
-  const minutes = String(d.getMinutes()).padStart(2, "0");
-  return `${year}-${month}-${date}T${hours}:${minutes}`;
-}
-
-function formatDateTime(isoStr?: string | null): string {
-  if (!isoStr) return "—";
-  const d = new Date(isoStr);
-  if (isNaN(d.getTime())) return "—";
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
-
-export function BackupConfigForm({ provider, initialData, onSuccess }: BackupConfigFormProps) {
+export function BackupConfigForm({ provider, initialData, scheduleEnabled, onSuccess }: BackupConfigFormProps) {
   const [repoUrl, setRepoUrl] = useState(initialData?.repoUrl || "");
   const [branch, setBranch] = useState(initialData?.branch || "main");
   const [path, setPath] = useState(initialData?.path || "diary/");
   const [token, setToken] = useState("");
   const [tokenShown, setTokenShown] = useState(false);
   const [loadingToken, setLoadingToken] = useState(false);
-  const [scope, setScope] = useState("week");
+  const [scope, setScope] = useState(initialData?.scheduleScope || "week");
+  const [scheduleTime, setScheduleTime] = useState(() => {
+    if (initialData?.scheduleTime) {
+      const d = new Date(initialData.scheduleTime);
+      if (!isNaN(d.getTime())) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        const h = String(d.getHours()).padStart(2, "0");
+        const min = String(d.getMinutes()).padStart(2, "0");
+        return `${y}-${m}-${day}T${h}:${min}`;
+      }
+    }
+    const now = new Date();
+    const day = now.getDay();
+    const diff = day === 0 ? 7 : 7 - day;
+    const sunday = new Date(now);
+    sunday.setDate(now.getDate() + diff);
+    sunday.setHours(20, 0, 0, 0);
+    const y = sunday.getFullYear();
+    const m = String(sunday.getMonth() + 1).padStart(2, "0");
+    const d = String(sunday.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}T20:00`;
+  });
   const [saving, setSaving] = useState(false);
   const [backing, setBacking] = useState(false);
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<string | null>(null);
-
-  // Schedule state
-  const [scheduleEnabled, setScheduleEnabled] = useState(initialData?.scheduleEnabled || false);
-  const [scheduleTime, setScheduleTime] = useState(() => {
-    if (initialData?.scheduleTime) return toDatetimeLocal(new Date(initialData.scheduleTime));
-    return getNextSunday23();
-  });
-
-  // When toggle is turned on, auto-set to next Sunday 23:00 if empty
-  useEffect(() => {
-    if (scheduleEnabled && !scheduleTime) {
-      setScheduleTime(getNextSunday23());
-    }
-  }, [scheduleEnabled, scheduleTime]);
 
   const hasSavedToken = !!initialData?.hasToken;
 
@@ -97,17 +78,9 @@ export function BackupConfigForm({ provider, initialData, onSuccess }: BackupCon
         setToken(data.token);
         setTokenShown(true);
       }
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
     setLoadingToken(false);
   };
-
-  const buildScheduleBody = () => ({
-    scheduleEnabled,
-    scheduleScope: scope,
-    scheduleTime: scheduleEnabled ? new Date(scheduleTime).toISOString() : null,
-  });
 
   const handleSave = async () => {
     setSaving(true);
@@ -118,7 +91,9 @@ export function BackupConfigForm({ provider, initialData, onSuccess }: BackupCon
         body: JSON.stringify({
           provider, repoUrl, branch, path,
           token: token || undefined,
-          ...buildScheduleBody(),
+          scheduleEnabled,
+          scheduleScope: scope,
+          scheduleTime: new Date(scheduleTime).toISOString(),
         }),
       });
       const data = await res.json();
@@ -144,7 +119,9 @@ export function BackupConfigForm({ provider, initialData, onSuccess }: BackupCon
         body: JSON.stringify({
           provider, repoUrl, branch, path,
           token: token || undefined,
-          ...buildScheduleBody(),
+          scheduleEnabled,
+          scheduleScope: scope,
+          scheduleTime: new Date(scheduleTime).toISOString(),
         }),
       });
       const saveData = await saveRes.json();
@@ -153,13 +130,10 @@ export function BackupConfigForm({ provider, initialData, onSuccess }: BackupCon
         setBacking(false);
         return;
       }
-
-      const configId = saveData.configId;
-
       const backupRes = await fetch("/api/backup/execute", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ configId, scope }),
+        body: JSON.stringify({ configId: saveData.configId, scope }),
       });
       const backupData = await backupRes.json();
       if (backupData.success) {
@@ -229,7 +203,7 @@ export function BackupConfigForm({ provider, initialData, onSuccess }: BackupCon
 
   return (
     <div className="space-y-3 p-4 rounded-xl border border-border bg-card">
-      <h3 className="font-medium text-sm text-foreground capitalize">{provider} 备份</h3>
+      <h3 className="font-medium text-sm text-foreground capitalize">{provider} 配置</h3>
 
       <div className="space-y-1.5">
         <Label className="text-xs">仓库地址</Label>
@@ -313,47 +287,17 @@ export function BackupConfigForm({ provider, initialData, onSuccess }: BackupCon
         </select>
       </div>
 
-      {/* Schedule toggle */}
-      <div className="border-t border-border pt-3 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-muted-foreground" />
-            <Label className="text-xs">定时备份</Label>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={scheduleEnabled}
-            onClick={() => setScheduleEnabled(!scheduleEnabled)}
-            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors ${scheduleEnabled ? "bg-primary" : "bg-muted"}`}
-          >
-            <span
-              className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${scheduleEnabled ? "translate-x-[18px]" : "translate-x-[3px]"}`}
-            />
-          </button>
-        </div>
-
-        {scheduleEnabled && (
-          <div className="space-y-2 pl-6">
-            <div className="flex items-center gap-2">
-              <Label className="text-xs shrink-0">执行时间：</Label>
-              <Input
-                type="datetime-local"
-                value={scheduleTime}
-                onChange={(e) => setScheduleTime(e.target.value)}
-                className="h-8 text-xs w-auto"
-              />
-            </div>
-            <p className="text-[10px] text-muted-foreground">
-              默认每周日 23:00 执行，届时自动按「备份范围」设定的范围备份。时间到达后自动更新为下周同时段。
-            </p>
-            {initialData?.scheduleLastRun && (
-              <p className="text-[10px] text-muted-foreground">
-                上次执行：{formatDateTime(initialData.scheduleLastRun)}
-              </p>
-            )}
-          </div>
-        )}
+      {/* 自定义备份时间 */}
+      <div className="flex items-center gap-2">
+        <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+        <Label className="text-xs shrink-0">执行时间：</Label>
+        <Input
+          type="datetime-local"
+          value={scheduleTime}
+          onChange={(e) => setScheduleTime(e.target.value)}
+          className="h-8 text-xs w-auto"
+        />
+        <span className="text-[10px] text-muted-foreground">默认每周日 20:00</span>
       </div>
 
       {result && (

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { encrypt } from "@/lib/crypto";
+import { refreshUserSchedule } from "@/lib/schedule-runner";
 import { z } from "zod";
 
 const configSchema = z.object({
@@ -13,7 +14,19 @@ const configSchema = z.object({
   scheduleEnabled: z.boolean().optional(),
   scheduleScope: z.enum(["week", "month", "all"]).optional(),
   scheduleTime: z.string().nullable().optional(),
+  scheduleInterval: z.number().int().min(5000).max(7200000).optional(),
 });
+
+/** 计算下一个周日 20:00 */
+function getNextSunday23(): Date {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = day === 0 ? 7 : 7 - day;
+  const sunday = new Date(now);
+  sunday.setDate(now.getDate() + diff);
+  sunday.setHours(20, 0, 0, 0);
+  return sunday;
+}
 
 export async function GET() {
   const session = await auth();
@@ -23,7 +36,7 @@ export async function GET() {
 
   const configs = await prisma.backupConfig.findMany({
     where: { userId: session.user.id },
-    select: { id: true, provider: true, repoUrl: true, branch: true, path: true, token: true, scheduleEnabled: true, scheduleScope: true, scheduleTime: true, scheduleLastRun: true },
+    select: { id: true, provider: true, repoUrl: true, branch: true, path: true, token: true, scheduleEnabled: true, scheduleScope: true, scheduleTime: true, scheduleLastRun: true, scheduleInterval: true },
   });
 
   const result = configs.map((c) => ({
@@ -37,6 +50,7 @@ export async function GET() {
     scheduleScope: c.scheduleScope,
     scheduleTime: c.scheduleTime?.toISOString() ?? null,
     scheduleLastRun: c.scheduleLastRun?.toISOString() ?? null,
+    scheduleInterval: c.scheduleInterval,
   }));
 
   return NextResponse.json({ configs: result });
@@ -74,6 +88,12 @@ export async function PUT(request: NextRequest) {
     if (data.scheduleTime !== undefined) {
       scheduleData.scheduleTime = data.scheduleTime ? new Date(data.scheduleTime) : null;
     }
+    if (data.scheduleInterval !== undefined) scheduleData.scheduleInterval = data.scheduleInterval;
+
+    // 开启定时但没传 scheduleTime 时，设置默认值（新建或重新启用）
+    if (data.scheduleEnabled === true && !data.scheduleTime && scheduleData.scheduleTime === undefined) {
+      scheduleData.scheduleTime = getNextSunday23();
+    }
 
     if (existing) {
       await prisma.backupConfig.update({
@@ -100,6 +120,12 @@ export async function PUT(request: NextRequest) {
         },
       });
       configId = created.id;
+    }
+
+    // 只在定时配置变更时刷新定时器
+    const hasScheduleChange = data.scheduleEnabled !== undefined || data.scheduleScope !== undefined || data.scheduleTime !== undefined || data.scheduleInterval !== undefined;
+    if (hasScheduleChange) {
+      await refreshUserSchedule(session.user.id);
     }
 
     return NextResponse.json({ success: true, configId });

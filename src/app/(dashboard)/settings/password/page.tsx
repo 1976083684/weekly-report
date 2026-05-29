@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Lock } from "lucide-react";
+import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,8 +22,12 @@ export default function PasswordPage() {
       body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw, confirmPassword: confirmPw }),
     });
     const data = await res.json();
-    setPwMsg(data.success ? "密码修改成功" : data.error || "修改失败");
-    if (data.success) { setCurrentPw(""); setNewPw(""); setConfirmPw(""); }
+    if (data.success) {
+      setPwMsg("密码修改成功，即将跳转到登录页...");
+      setTimeout(() => signOut({ callbackUrl: "/login" }), 1500);
+    } else {
+      setPwMsg(data.error || "修改失败");
+    }
   };
 
   return (
