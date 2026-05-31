@@ -5,6 +5,7 @@ import { nowShanghai, daysAgoShanghai } from "@/lib/shanghai-time";
 const DEFAULT_INTERVAL = 60 * 60 * 1000;
 const timers = new Map<string, NodeJS.Timeout>();
 const running = new Set<string>();
+const timerGeneration = new Map<string, number>(); // 版本号，防止竞态条件
 
 /** 计算下一个周日 20:00 */
 function nextSunday20(): Date {
@@ -116,10 +117,25 @@ async function startUserTimer(userId: string) {
   if (!config) return;
 
   const interval = config.scheduleInterval || DEFAULT_INTERVAL;
+  const generation = (timerGeneration.get(userId) || 0) + 1;
+  timerGeneration.set(userId, generation);
 
   async function tick() {
+    // 检查版本号，如果已被更新则不再继续
+    if (timerGeneration.get(userId) !== generation) {
+      console.log(`[定时备份] 用户${userId} 定时器已更新，停止旧定时器 (gen=${generation})`);
+      return;
+    }
+
     await cleanUserLogs(userId);
     await checkUserSchedule(userId);
+
+    // 再次检查版本号（await 期间可能被更新）
+    if (timerGeneration.get(userId) !== generation) {
+      console.log(`[定时备份] 用户${userId} 定时器已更新，停止旧定时器 (gen=${generation})`);
+      return;
+    }
+
     // 重新读取最新间隔（用户可能修改了）
     const latest = await prisma.backupConfig.findFirst({
       where: { userId, scheduleEnabled: true },
