@@ -201,7 +201,6 @@ export async function startSchedule() {
     select: { userId: true },
     distinct: ["userId"],
   });
-  console.log(`[定时备份] 启用定时的用户: ${users.map(u => u.userId).join(", ")}`);
   for (const u of users) {
     startUserTimer(u.userId);
   }
