@@ -95,6 +95,18 @@ export async function PUT(request: NextRequest) {
       scheduleData.scheduleTime = getNextSunday23();
     }
 
+    // 如果要开启定时，先关闭其他配置的定时（确保只有一个配置启用定时）
+    if (data.scheduleEnabled === true) {
+      await prisma.backupConfig.updateMany({
+        where: {
+          userId: session.user.id,
+          scheduleEnabled: true,
+          provider: { not: data.provider },
+        },
+        data: { scheduleEnabled: false },
+      });
+    }
+
     if (existing) {
       await prisma.backupConfig.update({
         where: { id: existing.id },
