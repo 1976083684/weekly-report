@@ -8,10 +8,42 @@ const running = new Set<string>();
 const timerGeneration = new Map<string, number>(); // 版本号，防止竞态条件
 
 /** 计算下一个周日 20:00 */
-function nextSunday20(): Date {
+function nextSunday20(scheduleLastRun?: Date | null): Date {
   const now = new Date();
   const day = now.getDay();
-  const diff = day === 0 ? 7 : 7 - day;
+  const hour = now.getHours();
+
+  // 如果今天是周日
+  if (day === 0) {
+    // 还没到 20:00
+    if (hour < 20) {
+      // 检查本周是否已经执行过备份（上次执行是否在本周日 00:00 之后）
+      if (scheduleLastRun) {
+        const lastRun = new Date(scheduleLastRun);
+        const lastRunDay = lastRun.getDay();
+        // 如果上次执行是在本周日（无论几点），说明本周已备份
+        if (lastRunDay === 0) {
+          // 本周已执行过，跳到下周日
+          const nextSunday = new Date(now);
+          nextSunday.setDate(now.getDate() + 7);
+          nextSunday.setHours(20, 0, 0, 0);
+          return nextSunday;
+        }
+      }
+      // 本周还没执行过，返回今天 20:00
+      const today = new Date(now);
+      today.setHours(20, 0, 0, 0);
+      return today;
+    }
+    // 已过 20:00，跳到下周日
+    const nextSunday = new Date(now);
+    nextSunday.setDate(now.getDate() + 7);
+    nextSunday.setHours(20, 0, 0, 0);
+    return nextSunday;
+  }
+
+  // 周一到周六，返回本周日 20:00
+  const diff = 7 - day;
   const sunday = new Date(now);
   sunday.setDate(now.getDate() + diff);
   sunday.setHours(20, 0, 0, 0);
@@ -27,9 +59,9 @@ function nextMonth23(): Date {
   return d;
 }
 
-function computeNextTime(scope: string): Date {
+function computeNextTime(scope: string, scheduleLastRun?: Date | null): Date {
   if (scope === "month") return nextMonth23();
-  return nextSunday20();
+  return nextSunday20(scheduleLastRun);
 }
 
 /** 检查单个用户的所有定时备份 */
@@ -49,7 +81,7 @@ async function checkUserSchedule(userId: string) {
         const scope = config.scheduleScope || "week";
 
         // 先推进 scheduleTime，防止并发重复触发
-        const nextTime = computeNextTime(scope);
+        const nextTime = computeNextTime(scope, config.scheduleLastRun);
         await prisma.backupConfig.update({
           where: { id: config.id },
           data: { scheduleLastRun: now, scheduleTime: nextTime },
